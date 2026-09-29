@@ -13,4 +13,5 @@ class Settings(BaseSettings):
     database_url: PostgresDsn = Field(repr=False)
     database_pool_size: int = Field(default=5, ge=1)
     database_pool_timeout_seconds: int = Field(default=5, ge=1)
+    database_connect_timeout_seconds: int = Field(default=5, ge=1)
     database_statement_timeout_ms: int = Field(default=5000, ge=1)

@@ -1,4 +1,4 @@
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, text
 
 from app.config import Settings
 
@@ -12,9 +12,14 @@ def create_database_engine(settings: Settings) -> Engine:
         pool_pre_ping=True,
         hide_parameters=True,
         connect_args={
-            "connect_timeout": settings.database_pool_timeout_seconds,
+            "connect_timeout": settings.database_connect_timeout_seconds,
             "options": (
                 f"-c statement_timeout={settings.database_statement_timeout_ms}"
             ),
         },
     )
+
+
+def check_database_connection(engine: Engine) -> None:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1")).scalar_one()
