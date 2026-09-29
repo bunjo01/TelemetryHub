@@ -2,8 +2,10 @@
 
 ## Scope
 Applies to Python + FastAPI backend code.
+Engineers and AI contributors should follow these rules.
 
 Goal: maintainable, testable, production-oriented backend code.
+Preferences allow justified exceptions; mandatory safeguards use “must”.
 
 ## General Rules
 - Keep business logic independent from FastAPI where possible.
@@ -12,8 +14,13 @@ Goal: maintainable, testable, production-oriented backend code.
 - Keep dependencies flowing toward domain/application logic.
 - Do not mix HTTP, business logic, and persistence in one function.
 - Do not create abstractions before they are useful.
+- Reuse stable business rules; accept small duplication when sharing would couple unrelated features.
+- Solve current requirements with the fewest concepts needed; avoid speculative extension points.
 
 ## Suggested Layers
+
+Use these boundaries as the application grows, not as mandatory folders for every feature.
+Avoid interfaces or wrappers that only forward calls without a useful boundary.
 
 ```text
 api/
@@ -41,8 +48,10 @@ The domain should not depend directly on FastAPI or database drivers.
 - Prefer early returns over deep nesting.
 - Avoid mutable default arguments.
 - Avoid global mutable state.
-- Use `async` only for real asynchronous I/O.
-- Do not mix sync and async carelessly.
+- Follow idiomatic Python and existing project conventions; prefer standard-library solutions when sufficient.
+- Use `async` to coordinate asynchronous I/O; it does not make CPU-heavy work faster.
+- Keep blocking I/O and expensive CPU work off the event loop using an appropriate, bounded execution mechanism.
+- Preserve cancellation and use context managers or `finally` to release resources on every exit path.
 
 ## Naming
 Use:
@@ -50,18 +59,9 @@ Use:
 - `PascalCase` for classes,
 - `UPPER_SNAKE_CASE` for constants.
 
-Prefer descriptive names:
-
-```python
-get_active_alerts()
-```
-
-Avoid:
-
-```python
-process_data()
-handle_thing()
-```
+Choose names that explain the domain and action in context, such as `get_active_alerts()`.
+Avoid vague names such as `handle_thing()` and unnecessary abbreviations.
+Include units when ambiguous (`timeout_seconds`) and distinguish `event_time` from `ingestion_time`.
 
 ## API Design
 - Use REST semantics correctly.
@@ -84,6 +84,9 @@ Separate:
 - business validation,
 - authorization.
 
+Bound request sizes, collection lengths, page sizes, and query time ranges.
+Authorization must enforce company isolation for every resource access; valid input alone is not permission.
+
 ## Error Handling
 Distinguish:
 - validation errors,
@@ -95,14 +98,16 @@ Distinguish:
 
 Map internal errors to HTTP/gRPC responses at the boundary.
 
-Do not use exceptions for normal control flow.
+Use exceptions idiomatically for failures; prefer simple branching for routine decisions.
+Catch errors where they can be handled meaningfully, preserve their cause, and never silently swallow failures.
 
 ## Persistence
 - Use repositories where they improve separation.
-- Keep transactions explicit.
+- Make transaction ownership, commit, and rollback explicit.
 - Avoid hidden database calls.
 - Avoid N+1 queries.
-- Keep transactions short.
+- Keep transactions short; avoid external network calls while holding them open.
+- Enforce data invariants with database constraints where possible and handle concurrent updates deliberately.
 - Do not return ORM models directly from API handlers.
 - Use migrations for schema changes.
 
@@ -115,9 +120,11 @@ Use dependency injection for:
 - external services.
 
 Avoid hidden globals and service locators.
+Use ordinary parameters or FastAPI dependencies; a custom injection framework is not required.
 
 ## Configuration
-Configuration must not be hard-coded.
+Keep environment-specific settings and secrets outside code; make operational limits configurable.
+Stable domain constants and safe default values can live in code.
 
 Examples:
 - database URLs,
@@ -155,7 +162,16 @@ Use where appropriate:
 
 Every network call should have a timeout.
 
-Retries must be bounded.
+Retries must have bounded attempts and an overall time budget.
+Retry only transient failures when repeating the operation is safe, using backoff and jitter.
+Assign retries to a clear layer so nested retries do not multiply the load.
+
+## Resource Efficiency
+- Bound concurrent work, queues, batches, and caches; define how overload is rejected or delayed.
+- Paginate or stream large results; fetch needed fields and avoid loading entire datasets to filter them.
+- Reuse connection pools and long-lived clients with explicit startup/shutdown ownership; keep sessions scoped to a unit of work.
+- Consider algorithmic cost, repeated queries, and unnecessary copies as data grows.
+- Measure CPU, peak memory, latency, and throughput on representative workloads before adding complex optimizations.
 
 ## Testing
 ### Unit
@@ -166,7 +182,7 @@ Test:
 - transformations.
 
 ### Integration
-Test:
+Test the dependencies actually used by the feature:
 - PostgreSQL,
 - Redis,
 - Kafka,
@@ -178,6 +194,7 @@ Test:
 Test:
 - status codes,
 - authentication,
+- authorization and company isolation,
 - validation,
 - error responses,
 - important endpoints.
@@ -187,18 +204,18 @@ General:
 - avoid mocking everything,
 - keep tests deterministic,
 - add regression tests for fixed bugs.
+- cover relevant limits, concurrent updates, duplicate requests, and dependency failures.
 
 ## Tooling
-Use:
-- Ruff,
-- Pyright,
-- pytest.
+Ruff is configured in `pyproject.toml`. Pyright and pytest are the intended tools
+for type checking and testing, but are not yet declared in the development dependencies.
+Configure them when introducing those checks; do not claim unavailable checks passed.
 
 Before merge:
 - lint passes,
 - format passes,
-- type checks pass,
-- tests pass,
+- configured type checks and relevant tests pass,
+- missing checks or untested behavior are reported,
 - no debug/dead code.
 
 ## Avoid
@@ -220,3 +237,6 @@ Before merge:
 - Are timeouts/retries safe?
 - Are types clear?
 - Are important paths tested?
+- Is company isolation enforced?
+- Are resource use and concurrency bounded, with cleanup on failure?
+- Does each abstraction simplify a current requirement?
