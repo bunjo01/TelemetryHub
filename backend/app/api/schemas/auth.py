@@ -1,4 +1,5 @@
 from typing import Literal
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -32,3 +33,11 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
+
+
+class UserResponse(BaseModel):
+    id: UUID
+    company_id: UUID | None
+    email: str
+    role: str
+    status: str

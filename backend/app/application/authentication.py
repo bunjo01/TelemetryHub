@@ -3,10 +3,18 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.infrastructure.passwords import verify_password
-from app.infrastructure.repositories.users import find_user_credentials
+from app.infrastructure.repositories.users import (
+    CurrentUser,
+    find_user_by_id,
+    find_user_credentials,
+)
 
 
 class InvalidCredentialsError(Exception):
+    pass
+
+
+class CurrentUserUnavailableError(Exception):
     pass
 
 
@@ -31,3 +39,19 @@ def authenticate_user(
         raise InvalidCredentialsError
 
     return credentials.id
+
+
+def load_current_user(
+    session: Session,
+    user_id: UUID,
+) -> CurrentUser:
+    with session.begin():
+        user = find_user_by_id(
+            session=session,
+            user_id=user_id,
+        )
+
+    if user is None or user.status != "active":
+        raise CurrentUserUnavailableError
+
+    return user
