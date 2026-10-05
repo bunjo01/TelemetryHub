@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     jwt_secret_key: SecretStr = Field(min_length=32, repr=False)
     access_token_expire_minutes: int = Field(default=15, ge=1, le=60)
     login_max_concurrent: int = Field(default=2, ge=1, le=16)
+    invitation_expire_hours: int = Field(default=24, ge=1, le=168)
 
 
 class MigrationSettings(BaseSettings):
