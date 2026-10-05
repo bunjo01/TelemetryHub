@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
 class CreateOwnerInvitationRequest(BaseModel):
@@ -28,3 +28,10 @@ class OwnerInvitationResponse(BaseModel):
     role: Literal["company_owner"] = "company_owner"
     expires_at: datetime
     token: str = Field(repr=False)
+
+
+class AcceptInvitationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: SecretStr = Field(min_length=43, max_length=43)
+    password: SecretStr = Field(min_length=15, max_length=128)

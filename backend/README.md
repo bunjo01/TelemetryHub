@@ -62,15 +62,40 @@ A missing company returns `404`. An inactive company, an existing owner
 (including an inactive owner), an email already registered, or an unexpired
 pending owner invitation returns `409`. After expiry, a new invitation can
 be issued. Creation locks the company row to serialize competing requests;
-future invitation acceptance must use the same company lock and recheck
+invitation acceptance uses the same company lock and rechecks
 ownership and email availability. Creation does not reserve the email globally.
 
-This endpoint does not create an owner account or send email. Invitation
-acceptance is not implemented yet.
+Creation does not create an owner account or send email.
+
+## Accepting owner invitations
+
+Call `POST /invitations/accept` without an access token. Send a JSON body with
+`token` (the 43-character invitation token) and `password` (15–128 characters).
+Passwords are preserved exactly, including whitespace. Email, role, and company
+are taken from the invitation; additional input fields are rejected.
+
+Success returns `201` with the public user fields and `Cache-Control: no-store`.
+The new owner can then log in through `/auth/login`. No access token is issued
+by acceptance itself.
+
+Unknown, expired, used, or unsupported invitations return a generic `400`.
+An inactive company, an existing owner, or an email that has since registered
+returns `409`. Invalid input returns `422`; overload or database availability
+failures return `503`. Overload responses include `Retry-After: 1`.
+
+Account insertion and marking the invitation accepted share one transaction.
+Password hashing runs outside that transaction, followed by locked revalidation.
+Login and acceptance share the per-process `LOGIN_MAX_CONCURRENT` capacity
+budget to bound simultaneous password work. This is a concurrency limit, not
+a per-client rate limiter. Email delivery and member invitation acceptance are
+not included yet.
 
 ## Tests
 
 Run `python -m pytest` from `backend/`. PostgreSQL invitation tests are skipped
 unless `TEST_DATABASE_URL` points to a migrated PostgreSQL test database with
 CRUD permissions on companies, users, and invitations. These tests wrap their
-data in an outer transaction and roll it back, including on failure.
+data in an outer transaction and roll it back, including on failure. The
+concurrency test needs independent connections, so it commits uniquely
+identified fixtures and deletes those test rows in a `finally` block. Use a
+disposable test database for these integration tests.

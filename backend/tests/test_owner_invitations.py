@@ -1,5 +1,4 @@
 import hashlib
-import os
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -8,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from sqlalchemy.orm import Session
@@ -175,30 +174,6 @@ def test_business_errors(
         ).status_code
         == status_code
     )
-
-
-@pytest.fixture
-def database_session() -> Iterator[Session]:
-    url = os.environ.get("TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("Set TEST_DATABASE_URL to a migrated PostgreSQL test database")
-    engine = create_engine(
-        url,
-        hide_parameters=True,
-        connect_args={"connect_timeout": 5, "options": "-c statement_timeout=5000"},
-    )
-    try:
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            try:
-                with Session(
-                    bind=connection, join_transaction_mode="create_savepoint"
-                ) as session:
-                    yield session
-            finally:
-                transaction.rollback()
-    finally:
-        engine.dispose()
 
 
 def seed(session: Session) -> tuple:

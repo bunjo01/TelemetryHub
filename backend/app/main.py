@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from app.api.auth import router as auth_router
 from app.api.companies import router as companies_router
 from app.api.health import router as health_router
+from app.api.invitations import acceptance_router as invitation_acceptance_router
 from app.api.invitations import router as invitations_router
 from app.config import Settings
 from app.infrastructure.database import create_database_engine
@@ -49,3 +50,4 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(companies_router)
 app.include_router(invitations_router)
+app.include_router(invitation_acceptance_router)

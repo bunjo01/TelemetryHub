@@ -1,12 +1,68 @@
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, select, update
 from sqlalchemy.orm import Session
 
 from app.infrastructure.models.company import Company
 from app.infrastructure.models.invitation import Invitation
 from app.infrastructure.models.user import User
+from app.infrastructure.repositories.users import CurrentUser
+
+
+@dataclass(frozen=True)
+class InvitationDetails:
+    id: UUID
+    company_id: UUID
+    email: str
+    role: str
+    created_at: datetime
+    expires_at: datetime
+    accepted_at: datetime | None
+
+
+def find_invitation(
+    session: Session, token_hash: str, *, for_update: bool = False
+) -> InvitationDetails | None:
+    statement = select(
+        Invitation.id,
+        Invitation.company_id,
+        Invitation.email,
+        Invitation.role,
+        Invitation.created_at,
+        Invitation.expires_at,
+        Invitation.accepted_at,
+    ).where(Invitation.token_hash == token_hash)
+    if for_update:
+        statement = statement.with_for_update()
+    row = session.execute(statement).one_or_none()
+    return InvitationDetails(*row) if row is not None else None
+
+
+def insert_owner(
+    session: Session, company_id: UUID, email: str, password_hash: str
+) -> CurrentUser:
+    user = User(
+        company_id=company_id,
+        email=email,
+        password_hash=password_hash,
+        role="company_owner",
+        status="active",
+    )
+    session.add(user)
+    session.flush()
+    return CurrentUser(user.id, user.company_id, user.email, user.role, user.status)
+
+
+def mark_invitation_accepted(
+    session: Session, invitation_id: UUID, accepted_at: datetime
+) -> None:
+    session.execute(
+        update(Invitation)
+        .where(Invitation.id == invitation_id)
+        .values(accepted_at=accepted_at)
+    )
 
 
 def lock_company_status(session: Session, company_id: UUID) -> str | None:

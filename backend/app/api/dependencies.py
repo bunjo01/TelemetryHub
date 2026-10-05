@@ -43,6 +43,17 @@ def get_dummy_password_hash(request: Request) -> str:
 
 
 def require_login_capacity(request: Request) -> Iterator[None]:
+    yield from require_password_capacity(request, "Login is busy. Try again shortly.")
+
+
+def require_invitation_acceptance_capacity(request: Request) -> Iterator[None]:
+    yield from require_password_capacity(
+        request, "Invitation acceptance is busy. Try again shortly."
+    )
+
+
+def require_password_capacity(request: Request, detail: str) -> Iterator[None]:
+    # Share one budget for login verification and invitation password hashing.
     slots = cast(
         BoundedSemaphore,
         request.app.state.login_slots,
@@ -51,8 +62,8 @@ def require_login_capacity(request: Request) -> Iterator[None]:
     if not slots.acquire(blocking=False):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Login is busy. Try again shortly.",
-            headers={"Retry-After": "1"},
+            detail=detail,
+            headers={"Retry-After": "1", "Cache-Control": "no-store"},
         )
 
     try:

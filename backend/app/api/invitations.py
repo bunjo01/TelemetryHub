@@ -9,21 +9,73 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import (
     get_database_session,
     get_settings,
+    require_invitation_acceptance_capacity,
     require_system_admin,
 )
+from app.api.schemas.auth import UserResponse
 from app.api.schemas.invitations import (
+    AcceptInvitationRequest,
     CreateOwnerInvitationRequest,
     OwnerInvitationResponse,
 )
 from app.application.invitations import (
     CompanyNotFoundError,
+    InvalidInvitationError,
     InvitationConflictError,
+    accept_owner_invitation,
     create_owner_invitation,
 )
 from app.config import Settings
 from app.infrastructure.repositories.users import CurrentUser
 
 router = APIRouter(prefix="/companies", tags=["invitations"])
+acceptance_router = APIRouter(prefix="/invitations", tags=["invitations"])
+
+
+@acceptance_router.post(
+    "/accept",
+    status_code=status.HTTP_201_CREATED,
+    response_model=UserResponse,
+    dependencies=[Depends(require_invitation_acceptance_capacity)],
+    responses={
+        400: {"description": "Invalid, expired, or used invitation"},
+        409: {"description": "Account or company conflict"},
+        503: {"description": "Invitation acceptance unavailable"},
+    },
+)
+def accept_invitation_endpoint(
+    payload: AcceptInvitationRequest,
+    response: Response,
+    session: Annotated[Session, Depends(get_database_session)],
+) -> UserResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        user = accept_owner_invitation(
+            session=session,
+            token=payload.token.get_secret_value(),
+            password=payload.password.get_secret_value(),
+        )
+    except InvalidInvitationError:
+        raise HTTPException(
+            400, "Invalid or expired invitation.", headers={"Cache-Control": "no-store"}
+        ) from None
+    except InvitationConflictError as error:
+        raise HTTPException(
+            409, str(error), headers={"Cache-Control": "no-store"}
+        ) from None
+    except (OperationalError, SQLAlchemyTimeoutError):
+        raise HTTPException(
+            503,
+            "Invitation acceptance temporarily unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    return UserResponse(
+        id=user.id,
+        company_id=user.company_id,
+        email=user.email,
+        role=user.role,
+        status=user.status,
+    )
 
 
 @router.post(
