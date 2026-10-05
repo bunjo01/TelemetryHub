@@ -16,7 +16,7 @@ from app.api import dependencies
 from app.api import invitations as api
 from app.application.invitations import (
     CompanyNotFoundError,
-    CreatedOwnerInvitation,
+    CreatedInvitation,
     InvitationConflictError,
     create_owner_invitation,
 )
@@ -59,7 +59,7 @@ def test_create_response(client: TestClient, monkeypatch: pytest.MonkeyPatch) ->
         assert kwargs["company_id"] == COMPANY_ID
         assert kwargs["invited_by_id"] == ADMIN_ID
         assert kwargs["expires_in_hours"] == 24
-        return CreatedOwnerInvitation(
+        return CreatedInvitation(
             uuid4(), COMPANY_ID, kwargs["email"], datetime.now(UTC), "test-token"
         )
 

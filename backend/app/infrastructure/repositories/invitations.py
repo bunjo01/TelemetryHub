@@ -40,14 +40,14 @@ def find_invitation(
     return InvitationDetails(*row) if row is not None else None
 
 
-def insert_owner(
-    session: Session, company_id: UUID, email: str, password_hash: str
+def insert_invited_user(
+    session: Session, company_id: UUID, email: str, password_hash: str, role: str
 ) -> CurrentUser:
     user = User(
         company_id=company_id,
         email=email,
         password_hash=password_hash,
-        role="company_owner",
+        role=role,
         status="active",
     )
     session.add(user)
@@ -87,6 +87,24 @@ def email_has_account(session: Session, email: str) -> bool:
     return bool(session.scalar(select(exists().where(User.email == email))))
 
 
+def has_pending_member_invitation(
+    session: Session, company_id: UUID, email: str, now: datetime
+) -> bool:
+    return bool(
+        session.scalar(
+            select(
+                exists().where(
+                    Invitation.company_id == company_id,
+                    Invitation.email == email,
+                    Invitation.role == "member",
+                    Invitation.accepted_at.is_(None),
+                    Invitation.expires_at > now,
+                )
+            )
+        )
+    )
+
+
 def has_pending_owner_invitation(
     session: Session, company_id: UUID, now: datetime
 ) -> bool:
@@ -104,12 +122,13 @@ def has_pending_owner_invitation(
     )
 
 
-def insert_owner_invitation(
+def insert_invitation(
     session: Session,
     company_id: UUID,
     invited_by_id: UUID,
     email: str,
     token_hash: str,
+    role: str,
     created_at: datetime,
     expires_at: datetime,
 ) -> UUID:
@@ -117,7 +136,7 @@ def insert_owner_invitation(
         company_id=company_id,
         invited_by_id=invited_by_id,
         email=email,
-        role="company_owner",
+        role=role,
         token_hash=token_hash,
         created_at=created_at,
         expires_at=expires_at,

@@ -7,6 +7,7 @@ from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
+    get_current_user,
     get_database_session,
     get_settings,
     require_invitation_acceptance_capacity,
@@ -15,14 +16,17 @@ from app.api.dependencies import (
 from app.api.schemas.auth import UserResponse
 from app.api.schemas.invitations import (
     AcceptInvitationRequest,
-    CreateOwnerInvitationRequest,
+    CreateInvitationRequest,
+    MemberInvitationResponse,
     OwnerInvitationResponse,
 )
 from app.application.invitations import (
     CompanyNotFoundError,
     InvalidInvitationError,
     InvitationConflictError,
-    accept_owner_invitation,
+    InvitationPermissionError,
+    accept_invitation,
+    create_member_invitation,
     create_owner_invitation,
 )
 from app.config import Settings
@@ -30,6 +34,54 @@ from app.infrastructure.repositories.users import CurrentUser
 
 router = APIRouter(prefix="/companies", tags=["invitations"])
 acceptance_router = APIRouter(prefix="/invitations", tags=["invitations"])
+
+
+@router.post(
+    "/{company_id}/member-invitations",
+    status_code=201,
+    response_model=MemberInvitationResponse,
+    responses={
+        401: {"description": "Invalid credentials"},
+        403: {"description": "Owner access to this company required"},
+        404: {"description": "Company not found"},
+        409: {"description": "Invitation conflicts with current state"},
+        503: {"description": "Invitation creation unavailable"},
+    },
+)
+def create_member_invitation_endpoint(
+    company_id: UUID,
+    payload: CreateInvitationRequest,
+    response: Response,
+    owner: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_database_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> MemberInvitationResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        invitation = create_member_invitation(
+            session=session,
+            company_id=company_id,
+            owner=owner,
+            email=str(payload.email),
+            expires_in_hours=settings.invitation_expire_hours,
+        )
+    except InvitationPermissionError:
+        raise HTTPException(403, "Company owner access required.") from None
+    except CompanyNotFoundError:
+        raise HTTPException(404, "Company not found.") from None
+    except InvitationConflictError as error:
+        raise HTTPException(409, str(error)) from None
+    except (OperationalError, SQLAlchemyTimeoutError):
+        raise HTTPException(
+            503, "Invitation creation temporarily unavailable."
+        ) from None
+    return MemberInvitationResponse(
+        id=invitation.id,
+        company_id=invitation.company_id,
+        email=invitation.email,
+        expires_at=invitation.expires_at,
+        token=invitation.token,
+    )
 
 
 @acceptance_router.post(
@@ -50,7 +102,7 @@ def accept_invitation_endpoint(
 ) -> UserResponse:
     response.headers["Cache-Control"] = "no-store"
     try:
-        user = accept_owner_invitation(
+        user = accept_invitation(
             session=session,
             token=payload.token.get_secret_value(),
             password=payload.password.get_secret_value(),
@@ -92,7 +144,7 @@ def accept_invitation_endpoint(
 )
 def create_owner_invitation_endpoint(
     company_id: UUID,
-    payload: CreateOwnerInvitationRequest,
+    payload: CreateInvitationRequest,
     response: Response,
     admin: Annotated[CurrentUser, Depends(require_system_admin)],
     session: Annotated[Session, Depends(get_database_session)],

@@ -42,7 +42,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     def unexpected_accept(**kwargs):
         pytest.fail("Invalid input must not reach acceptance")
 
-    monkeypatch.setattr(api, "accept_owner_invitation", unexpected_accept)
+    monkeypatch.setattr(api, "accept_invitation", unexpected_accept)
     with TestClient(app) as test_client:
         yield test_client
 
@@ -57,7 +57,7 @@ def test_acceptance_is_public_and_returns_only_user(
         assert kwargs["password"] == PASSWORD
         return user
 
-    monkeypatch.setattr(api, "accept_owner_invitation", accept)
+    monkeypatch.setattr(api, "accept_invitation", accept)
     response = client.post(
         "/invitations/accept", json={"token": TOKEN, "password": PASSWORD}
     )
@@ -108,7 +108,7 @@ def test_error_mapping_and_capacity_release(
     def fail(**kwargs):
         raise error
 
-    monkeypatch.setattr(api, "accept_owner_invitation", fail)
+    monkeypatch.setattr(api, "accept_invitation", fail)
     response = client.post(
         "/invitations/accept", json={"token": TOKEN, "password": PASSWORD}
     )
@@ -138,7 +138,9 @@ def test_route_is_public() -> None:
     assert not operation.get("security")
 
 
-def seed_invitation(session: Session) -> tuple[Invitation, str]:
+def seed_invitation(
+    session: Session, role: str = "company_owner"
+) -> tuple[Invitation, str]:
     admin_id, company_id = uuid4(), uuid4()
     token = secrets.token_urlsafe(32)
     now = datetime.now(UTC)
@@ -158,7 +160,7 @@ def seed_invitation(session: Session) -> tuple[Invitation, str]:
             company_id=company_id,
             invited_by_id=admin_id,
             email=f"{uuid4()}@example.com",
-            role="company_owner",
+            role=role,
             token_hash=hashlib.sha256(token.encode()).hexdigest(),
             created_at=now,
             expires_at=now + timedelta(hours=24),
@@ -171,7 +173,7 @@ def seed_invitation(session: Session) -> tuple[Invitation, str]:
 
 def test_postgres_acceptance_and_reuse(database_session: Session) -> None:
     invitation, token = seed_invitation(database_session)
-    user = application.accept_owner_invitation(database_session, token, PASSWORD)
+    user = application.accept_invitation(database_session, token, PASSWORD)
     assert user.company_id == invitation.company_id
     assert user.email == invitation.email
     assert user.role == "company_owner" and user.status == "active"
@@ -181,10 +183,10 @@ def test_postgres_acceptance_and_reuse(database_session: Session) -> None:
         assert verify_password(PASSWORD, stored.password_hash)
         assert database_session.get(Invitation, invitation.id).accepted_at is not None
     with pytest.raises(application.InvalidInvitationError):
-        application.accept_owner_invitation(database_session, token, PASSWORD)
+        application.accept_invitation(database_session, token, PASSWORD)
 
 
-@pytest.mark.parametrize("scenario", ["unknown", "expired", "used", "member"])
+@pytest.mark.parametrize("scenario", ["unknown", "expired", "used"])
 def test_unusable_tokens_do_not_hash(
     database_session: Session, monkeypatch: pytest.MonkeyPatch, scenario: str
 ) -> None:
@@ -196,8 +198,6 @@ def test_unusable_tokens_do_not_hash(
             row.expires_at = datetime.now(UTC) - timedelta(days=1)
         elif scenario == "used":
             row.accepted_at = datetime.now(UTC)
-        elif scenario == "member":
-            row.role = "member"
         else:
             token = secrets.token_urlsafe(32)
 
@@ -206,7 +206,7 @@ def test_unusable_tokens_do_not_hash(
 
     monkeypatch.setattr(application, "hash_password", unexpected_hash)
     with pytest.raises(application.InvalidInvitationError):
-        application.accept_owner_invitation(database_session, token, PASSWORD)
+        application.accept_invitation(database_session, token, PASSWORD)
 
 
 @pytest.mark.parametrize("scenario", ["inactive", "owner", "email"])
@@ -227,7 +227,7 @@ def test_state_is_rechecked(database_session: Session, scenario: str) -> None:
                 )
             )
     with pytest.raises(application.InvitationConflictError):
-        application.accept_owner_invitation(database_session, token, PASSWORD)
+        application.accept_invitation(database_session, token, PASSWORD)
     with database_session.begin():
         assert database_session.get(Invitation, invitation.id).accepted_at is None
 
@@ -242,7 +242,7 @@ def test_user_insert_rolls_back_if_consumption_fails(
 
     monkeypatch.setattr(application.repository, "mark_invitation_accepted", fail)
     with pytest.raises(SQLAlchemyTimeoutError):
-        application.accept_owner_invitation(database_session, token, PASSWORD)
+        application.accept_invitation(database_session, token, PASSWORD)
     with database_session.begin():
         assert (
             database_session.scalar(
@@ -264,7 +264,7 @@ def test_hashing_has_no_open_transaction(
         return real_hash(password)
 
     monkeypatch.setattr(application, "hash_password", checked_hash)
-    application.accept_owner_invitation(database_session, token, PASSWORD)
+    application.accept_invitation(database_session, token, PASSWORD)
 
 
 def test_expiry_is_rechecked_after_hashing(
@@ -286,7 +286,7 @@ def test_expiry_is_rechecked_after_hashing(
 
     monkeypatch.setattr(application, "hash_password", expire_during_hash)
     with pytest.raises(application.InvalidInvitationError):
-        application.accept_owner_invitation(database_session, token, PASSWORD)
+        application.accept_invitation(database_session, token, PASSWORD)
     with database_session.begin():
         assert (
             database_session.scalar(
@@ -297,7 +297,8 @@ def test_expiry_is_rechecked_after_hashing(
         assert database_session.get(Invitation, invitation.id).accepted_at is None
 
 
-def test_concurrent_acceptance(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("role", ["company_owner", "member"])
+def test_concurrent_acceptance(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
     url = os.environ.get("TEST_DATABASE_URL")
     if not url:
         pytest.skip("Set TEST_DATABASE_URL for PostgreSQL concurrency tests")
@@ -311,7 +312,7 @@ def test_concurrent_acceptance(monkeypatch: pytest.MonkeyPatch) -> None:
         # Independent connections must see committed fixtures. Delete only these
         # uniquely identified test rows in finally, in foreign-key order.
         with Session(engine) as session:
-            invitation, token = seed_invitation(session)
+            invitation, token = seed_invitation(session, role)
         barrier = Barrier(2, timeout=10)
         real_hash = application.hash_password
 
@@ -325,7 +326,7 @@ def test_concurrent_acceptance(monkeypatch: pytest.MonkeyPatch) -> None:
         def accept() -> str:
             with Session(engine) as session:
                 try:
-                    application.accept_owner_invitation(session, token, PASSWORD)
+                    application.accept_invitation(session, token, PASSWORD)
                     return "created"
                 except application.InvalidInvitationError:
                     return "used"

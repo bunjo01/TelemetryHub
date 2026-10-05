@@ -25,20 +25,24 @@ class InvalidInvitationError(Exception):
     pass
 
 
+class InvitationPermissionError(Exception):
+    pass
+
+
 def require_usable_invitation(
     invitation: repository.InvitationDetails | None, now: datetime
 ) -> repository.InvitationDetails:
     if (
         invitation is None
         or invitation.accepted_at is not None
-        or invitation.role != "company_owner"
+        or invitation.role not in ("company_owner", "member")
         or not invitation.created_at <= now < invitation.expires_at
     ):
         raise InvalidInvitationError
     return invitation
 
 
-def accept_owner_invitation(session: Session, token: str, password: str) -> CurrentUser:
+def accept_invitation(session: Session, token: str, password: str) -> CurrentUser:
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     # Reject unusable tokens before paying the password-hashing cost.
     with session.begin():
@@ -60,13 +64,15 @@ def accept_owner_invitation(session: Session, token: str, password: str) -> Curr
                 raise InvalidInvitationError
             if company_status != "active":
                 raise InvitationConflictError("Company is unavailable.")
-            if repository.company_has_owner(session, company_id):
+            if invitation.role == "company_owner" and repository.company_has_owner(
+                session, company_id
+            ):
                 raise InvitationConflictError("Company already has an owner.")
             if repository.email_has_account(session, invitation.email):
                 raise InvitationConflictError("Email already has an account.")
 
-            user = repository.insert_owner(
-                session, company_id, invitation.email, password_hash
+            user = repository.insert_invited_user(
+                session, company_id, invitation.email, password_hash, invitation.role
             )
             # An insert may wait for another writer; check expiration again.
             accepted_at = datetime.now(UTC)
@@ -87,7 +93,7 @@ def accept_owner_invitation(session: Session, token: str, password: str) -> Curr
 
 
 @dataclass(frozen=True)
-class CreatedOwnerInvitation:
+class CreatedInvitation:
     id: UUID
     company_id: UUID
     email: str
@@ -101,7 +107,7 @@ def create_owner_invitation(
     invited_by_id: UUID,
     email: str,
     expires_in_hours: int,
-) -> CreatedOwnerInvitation:
+) -> CreatedInvitation:
     with session.begin():
         # All owner-invitation writers must lock this row before checking.
         company_status = repository.lock_company_status(session, company_id)
@@ -122,14 +128,58 @@ def create_owner_invitation(
 
         token = secrets.token_urlsafe(32)
         expires_at = now + timedelta(hours=expires_in_hours)
-        invitation_id = repository.insert_owner_invitation(
+        invitation_id = repository.insert_invitation(
             session=session,
             company_id=company_id,
             invited_by_id=invited_by_id,
             email=email,
             token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            role="company_owner",
             created_at=now,
             expires_at=expires_at,
         )
 
-    return CreatedOwnerInvitation(invitation_id, company_id, email, expires_at, token)
+    return CreatedInvitation(invitation_id, company_id, email, expires_at, token)
+
+
+def create_member_invitation(
+    session: Session,
+    company_id: UUID,
+    owner: CurrentUser,
+    email: str,
+    expires_in_hours: int,
+) -> CreatedInvitation:
+    # Check scope before looking up the requested company or recipient.
+    if (
+        owner.role != "company_owner"
+        or owner.company_id != company_id
+        or owner.status != "active"
+    ):
+        raise InvitationPermissionError
+
+    with session.begin():
+        company_status = repository.lock_company_status(session, company_id)
+        if company_status is None:
+            raise CompanyNotFoundError
+        if company_status != "active":
+            raise InvitationConflictError("Company is inactive.")
+        if repository.email_has_account(session, email):
+            raise InvitationConflictError("Email already has an account.")
+        now = datetime.now(UTC)
+        if repository.has_pending_member_invitation(session, company_id, email, now):
+            raise InvitationConflictError(
+                "Email already has a pending member invitation."
+            )
+        token = secrets.token_urlsafe(32)
+        expires_at = now + timedelta(hours=expires_in_hours)
+        invitation_id = repository.insert_invitation(
+            session=session,
+            company_id=company_id,
+            invited_by_id=owner.id,
+            email=email,
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            role="member",
+            created_at=now,
+            expires_at=expires_at,
+        )
+    return CreatedInvitation(invitation_id, company_id, email, expires_at, token)

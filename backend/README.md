@@ -67,7 +67,26 @@ ownership and email availability. Creation does not reserve the email globally.
 
 Creation does not create an owner account or send email.
 
-## Accepting owner invitations
+## Member invitations
+
+An active company owner can call
+`POST /companies/{company_id}/member-invitations` with their bearer token and
+a JSON body containing only `email`. The requested company must match the
+owner's company. Members, system administrators, and owners of other companies
+receive `403`; the endpoint does not grant owner or administrator roles.
+
+The response is `201` with the same invitation fields as owner creation, but
+`role` is always `member`. Only the token hash is persisted. The same expiration
+configuration and one-time token response apply.
+
+The company must be active and the email must not already have an account.
+Only one unexpired pending member invitation per company/email is allowed;
+different emails can be invited independently. Company locking serializes
+duplicate creation attempts. Conflicts return `409`. Invitations to the same
+email from different companies may coexist, but only one can create an account
+because account emails are globally unique.
+
+## Accepting invitations
 
 Call `POST /invitations/accept` without an access token. Send a JSON body with
 `token` (the 43-character invitation token) and `password` (15–128 characters).
@@ -75,11 +94,11 @@ Passwords are preserved exactly, including whitespace. Email, role, and company
 are taken from the invitation; additional input fields are rejected.
 
 Success returns `201` with the public user fields and `Cache-Control: no-store`.
-The new owner can then log in through `/auth/login`. No access token is issued
+The new owner or member can then log in through `/auth/login`. No access token is issued
 by acceptance itself.
 
 Unknown, expired, used, or unsupported invitations return a generic `400`.
-An inactive company, an existing owner, or an email that has since registered
+An inactive company, an existing owner (for owner invitations), or an email that has since registered
 returns `409`. Invalid input returns `422`; overload or database availability
 failures return `503`. Overload responses include `Retry-After: 1`.
 
@@ -87,8 +106,8 @@ Account insertion and marking the invitation accepted share one transaction.
 Password hashing runs outside that transaction, followed by locked revalidation.
 Login and acceptance share the per-process `LOGIN_MAX_CONCURRENT` capacity
 budget to bound simultaneous password work. This is a concurrency limit, not
-a per-client rate limiter. Email delivery and member invitation acceptance are
-not included yet.
+a per-client rate limiter. Acceptance uses the stored invitation role, never a
+client-supplied role. Email delivery is not included yet.
 
 ## Tests
 

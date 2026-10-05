@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
-class CreateOwnerInvitationRequest(BaseModel):
+class CreateInvitationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr = Field(max_length=254)
@@ -35,3 +35,12 @@ class AcceptInvitationRequest(BaseModel):
 
     token: SecretStr = Field(min_length=43, max_length=43)
     password: SecretStr = Field(min_length=15, max_length=128)
+
+
+class MemberInvitationResponse(BaseModel):
+    id: UUID
+    company_id: UUID
+    email: str
+    role: Literal["member"] = "member"
+    expires_at: datetime
+    token: str = Field(repr=False)
