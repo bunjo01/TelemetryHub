@@ -103,3 +103,14 @@ def get_current_user(
             detail="Authentication temporarily unavailable.",
             headers={"Cache-Control": "no-store"},
         ) from None
+
+
+def require_system_admin(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> CurrentUser:
+    if current_user.role != "system_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System administrator access required.",
+        )
+    return current_user

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import router as auth_router
+from app.api.companies import router as companies_router
 from app.api.health import router as health_router
 from app.config import Settings
 from app.infrastructure.database import create_database_engine
@@ -45,3 +46,4 @@ async def handle_request_validation_error(
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(companies_router)
