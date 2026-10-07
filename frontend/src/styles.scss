@@ -35,3 +35,5 @@ input::placeholder { color: #7e90a3; }
 .error { background: #46212d; color: #ffc5cb; border: 1px solid #d8798c44; }
 .success { background: #153d35; color: #b2f0d9; border: 1px solid #75c6a344; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+body:has(dialog:modal) { overflow: hidden; }

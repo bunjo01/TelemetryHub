@@ -42,7 +42,7 @@ test("admin signs in, creates a company and signs out", async ({ page }) => {
   await page.getByLabel("Company name").fill("Orbital Labs");
   await page
     .locator("form")
-    .getByRole("button", { name: "Create company" })
+    .getByRole("button", { name: "Create", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText(
     "Orbital Labs was created",
@@ -105,12 +105,12 @@ test("expired session redirects to login with an explanation", async ({
   await page.getByLabel("Company name").fill("Orbital Labs");
   await page
     .locator("form")
-    .getByRole("button", { name: "Create company" })
+    .getByRole("button", { name: "Create", exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText("session has expired");
 });
 
-test("company failure preserves input and cancel returns keyboard focus", async ({
+test("company failure preserves input and closing returns keyboard focus", async ({
   page,
 }) => {
   await signIn(page);
@@ -121,13 +121,13 @@ test("company failure preserves input and cancel returns keyboard focus", async 
   await page.getByLabel("Company name").fill("Orbital Labs");
   await page
     .locator("form")
-    .getByRole("button", { name: "Create company" })
+    .getByRole("button", { name: "Create", exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText(
     "temporarily unavailable",
   );
   await expect(page.getByLabel("Company name")).toHaveValue("Orbital Labs");
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Close create company" }).click();
   await expect(
     page.getByRole("button", { name: "Create company" }),
   ).toBeFocused();
@@ -167,4 +167,41 @@ test("desktop and mobile pages fit their viewport", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("company popup traps focus, closes with Escape and resets when reopened", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await signIn(page);
+  await page
+    .getByRole("button", { name: "Create company", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create company" });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(dialog.getByRole("textbox")).toHaveCount(1);
+  await expect(page.getByLabel("Company name")).toBeFocused();
+  await page.getByLabel("Company name").fill("Unsubmitted company");
+  await page.keyboard.press("Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Create", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Close create company" }),
+  ).toBeFocused();
+  const bounds = await dialog.boundingBox();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(375);
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Create company", exact: true }),
+  ).toBeFocused();
+  await page
+    .getByRole("button", { name: "Create company", exact: true })
+    .click();
+  await expect(page.getByLabel("Company name")).toHaveValue("");
 });

@@ -9,7 +9,7 @@ const auth = useAuthStore();
 const router = useRouter();
 const isAdmin = computed(() => auth.user?.role === "system_admin");
 const isOwner = computed(() => auth.user?.role === "company_owner");
-const isFormOpen = ref(false);
+const companyDialog = ref(null);
 const name = ref("");
 const nameInput = ref(null);
 const createButton = ref(null);
@@ -19,13 +19,18 @@ const success = ref("");
 let pendingRequest;
 onBeforeUnmount(() => pendingRequest?.abort());
 
-async function toggleForm() {
-  isFormOpen.value = !isFormOpen.value;
+function openCompanyDialog() {
   error.value = "";
   success.value = "";
   name.value = "";
+  companyDialog.value.showModal();
+  nameInput.value?.focus();
+}
+async function closeCompanyDialog() {
+  if (isSaving.value) return;
+  companyDialog.value.close();
   await nextTick();
-  (isFormOpen.value ? nameInput.value : createButton.value)?.focus();
+  createButton.value?.focus();
 }
 async function submitCompany() {
   if (isSaving.value) return;
@@ -48,9 +53,8 @@ async function submitCompany() {
     if (controller.signal.aborted) return;
     success.value = `${company.name} was created successfully.`;
     name.value = "";
-    isFormOpen.value = false;
-    await nextTick();
-    createButton.value?.focus();
+    isSaving.value = false;
+    closeCompanyDialog();
   } catch (failure) {
     if (controller.signal.aborted) return;
     if (failure.status === 401) {
@@ -121,9 +125,9 @@ async function submitCompany() {
             type="button"
             class="button primary"
             :disabled="isSaving"
-            :aria-expanded="isFormOpen"
-            aria-controls="company-form"
-            @click="toggleForm"
+            aria-haspopup="dialog"
+            aria-controls="company-dialog"
+            @click="openCompanyDialog"
           >
             <span aria-hidden="true">＋</span>
             Create company
@@ -144,49 +148,58 @@ async function submitCompany() {
         <p v-if="success" class="message success" role="status">
           {{ success }}
         </p>
-        <form
-          v-if="isAdmin && isFormOpen"
-          id="company-form"
-          class="company-form"
-          :aria-busy="isSaving"
-          @submit.prevent="submitCompany"
-        >
-          <h3>A new company, a new orbit.</h3>
-          <label for="company-name">Company name</label>
-          <input
-            id="company-name"
-            ref="nameInput"
-            v-model="name"
-            required
-            maxlength="200"
-            autocomplete="organization"
-            placeholder="e.g. Orbital Labs"
-            :readonly="isSaving"
-            :aria-describedby="error ? 'company-error' : undefined"
-          >
-          <p v-if="error" id="company-error" class="message error" role="alert">
-            {{ error }}
-          </p>
-          <div class="actions">
-            <button class="button primary" type="submit" :disabled="isSaving">
-              {{ isSaving ? "Creating…" : "Create company" }}
-            </button><button
-              class="button secondary"
-              type="button"
-              :disabled="isSaving"
-              @click="toggleForm"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-        <div v-if="!isFormOpen" class="workspace-art" aria-hidden="true">
+        <div class="workspace-art" aria-hidden="true">
           <div class="ring ring-one"></div>
           <div class="ring ring-two"></div>
           <span>✧</span><i></i>
         </div>
       </section>
     </div>
+    <dialog
+      v-if="isAdmin"
+      id="company-dialog"
+      ref="companyDialog"
+      class="panel company-dialog"
+      aria-labelledby="company-dialog-title"
+      @cancel.prevent="closeCompanyDialog"
+    >
+      <div class="dialog-heading">
+        <h2 id="company-dialog-title">Create company</h2>
+        <button
+          type="button"
+          class="close-button"
+          aria-label="Close create company"
+          :disabled="isSaving"
+          @click="closeCompanyDialog"
+        >
+          ×
+        </button>
+      </div>
+      <form
+        class="company-form"
+        :aria-busy="isSaving"
+        @submit.prevent="submitCompany"
+      >
+        <label for="company-name">Company name</label>
+        <input
+          id="company-name"
+          ref="nameInput"
+          v-model="name"
+          required
+          maxlength="200"
+          autocomplete="organization"
+          placeholder="e.g. Orbital Labs"
+          :readonly="isSaving"
+          :aria-describedby="error ? 'company-error' : undefined"
+        >
+        <p v-if="error" id="company-error" class="message error" role="alert">
+          {{ error }}
+        </p>
+        <button class="button primary" type="submit" :disabled="isSaving">
+          {{ isSaving ? "Creating…" : "Create" }}
+        </button>
+      </form>
+    </dialog>
   </main>
 </template>
 
@@ -207,7 +220,15 @@ dl { margin: 2rem 0 0; } dl > div { padding: 1.3rem 0; border-top: 1px solid var
 .workspace-description { max-width: 27rem; line-height: 1.8; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
 .coming-soon { font-size: .75rem; color: var(--muted); }
-.company-form { border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 1.5rem; } .company-form input { display: block; width: 100%; margin-top: .6rem; } h3 { font-size: 1rem; font-weight: 500; }
+.company-dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100svh - 2rem); padding: 1.75rem; color: var(--text); }
+.company-dialog::backdrop { background: #030810b8; backdrop-filter: blur(5px); }
+.dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
+.dialog-heading h2 { margin: 0; }
+.close-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: .5rem; background: transparent; color: var(--muted); font-size: 1.5rem; }
+.close-button:hover:not(:disabled) { color: var(--text); background: #223547; }
+.company-form { display: grid; gap: .75rem; }
+.company-form .primary { margin-top: .75rem; }
+.company-form .message { margin: 0; }
 .workspace-art { position: relative; height: 130px; opacity: .55; pointer-events: none; margin-top: 2rem; } .ring { position: absolute; border: 1px solid #72b5bb44; width: 320px; height: 140px; border-radius: 50%; right: -60px; top: 20px; transform: rotate(-25deg); } .ring-two { transform: rotate(25deg); border-style: dashed; } .workspace-art > span { position: absolute; right: 60px; top: 35px; font-size: 3rem; color: var(--accent); } .workspace-art i { position: absolute; right: 220px; top: 105px; border-radius: 50%; width: 6px; height: 6px; background: var(--accent); box-shadow: 0 0 20px var(--accent); }
 @media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; } .profile-layout { padding-top: 2.5rem; } .identity, .workspace { padding: 1.5rem; } }
 </style>
