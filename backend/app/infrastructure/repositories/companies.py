@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.infrastructure.models.company import Company
@@ -29,3 +30,25 @@ def insert_company(session: Session, name: str) -> CurrentCompany:
         created_at=company.created_at,
         updated_at=company.updated_at,
     )
+
+
+@dataclass(frozen=True)
+class CompanyOption:
+    id: UUID
+    name: str
+
+
+def search_companies(
+    session: Session, query: str, limit: int, offset: int
+) -> list[CompanyOption]:
+    """Read a bounded page of active companies, treating search text literally."""
+    statement = (
+        select(Company.id, Company.name)
+        .where(Company.status == "active")
+        .order_by(func.lower(Company.name), Company.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    if query:
+        statement = statement.where(Company.name.icontains(query, autoescape=True))
+    return [CompanyOption(row.id, row.name) for row in session.execute(statement)]

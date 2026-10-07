@@ -23,3 +23,13 @@ class CompanyResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class CompanyOptionResponse(BaseModel):
+    id: UUID
+    name: str
+
+
+class CompanySearchResponse(BaseModel):
+    items: list[CompanyOptionResponse]
+    has_more: bool

@@ -158,3 +158,95 @@ def test_company_router_is_registered() -> None:
     operation = main_app.openapi()["paths"]["/companies"]["post"]
     assert "201" in operation["responses"]
     assert operation["security"] == [{"HTTPBearer": []}]
+
+
+def test_admin_searches_companies(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.infrastructure.repositories.companies import CompanyOption
+
+    def search(
+        session: Session, query: str, limit: int, offset: int
+    ) -> list[CompanyOption]:
+        assert session.in_transaction()
+        assert (query, limit, offset) == ("Orbital", 2, 0)
+        return [
+            CompanyOption(COMPANY_ID, "Orbital Labs"),
+            CompanyOption(USER_ID, "Orbital Tools"),
+        ]
+
+    monkeypatch.setattr(companies, "search_companies", search)
+    response = client.get("/companies?q=%20Orbital%20&limit=1", headers=headers())
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "items": [{"id": str(COMPANY_ID), "name": "Orbital Labs"}],
+        "has_more": True,
+    }
+
+
+@pytest.mark.parametrize("role", ["member", "company_owner"])
+def test_company_search_rejects_non_admin(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, role: str
+) -> None:
+    monkeypatch.setattr(
+        authentication,
+        "find_user_by_id",
+        lambda session, user_id: CurrentUser(
+            user_id, COMPANY_ID, "user@example.com", role, "active"
+        ),
+    )
+    assert client.get("/companies", headers=headers()).status_code == 403
+
+
+def test_company_search_requires_authentication(client: TestClient) -> None:
+    assert client.get("/companies").status_code == 401
+
+
+@pytest.mark.parametrize(
+    "query", ["limit=0", "limit=51", "offset=-1", "offset=10001", "q=" + "a" * 201]
+)
+def test_company_search_bounds(client: TestClient, query: str) -> None:
+    assert client.get("/companies?" + query, headers=headers()).status_code == 422
+
+
+def test_company_search_outage(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*args: object) -> None:
+        raise SQLAlchemyTimeoutError("private SQL")
+
+    monkeypatch.setattr(companies, "search_companies", fail)
+    response = client.get("/companies", headers=headers())
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Company search temporarily unavailable."}
+
+
+def test_company_search_in_postgres(database_session: Session) -> None:
+    from uuid import uuid4
+
+    from app.infrastructure.models.company import Company
+    from app.infrastructure.repositories.companies import search_companies
+
+    prefix = str(uuid4())
+    database_session.add_all(
+        [
+            Company(name=f"{prefix} Beta"),
+            Company(name=f"{prefix} Alpha"),
+            Company(name=f"{prefix} Hidden", status="inactive"),
+            Company(name=f"{prefix} 100%"),
+        ]
+    )
+    database_session.flush()
+    first = search_companies(database_session, prefix.upper(), 2, 0)
+    second = search_companies(database_session, prefix, 2, 2)
+    assert [item.name for item in first + second] == [
+        f"{prefix} 100%",
+        f"{prefix} Alpha",
+        f"{prefix} Beta",
+    ]
+    assert [
+        item.name
+        for item in search_companies(database_session, f"{prefix} 100%", 20, 0)
+    ] == [f"{prefix} 100%"]
+    assert search_companies(database_session, f"{prefix}_", 20, 0) == []
