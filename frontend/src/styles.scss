@@ -1,20 +1,16 @@
-$background: #eef3f6;
-$foreground: #142a3b;
+$background: #f5f7fa;
+$foreground: #172b3a;
 
 :root {
   font-family: system-ui, sans-serif;
   color: $foreground;
   background: $background;
+  line-height: 1.5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input, select, textarea { font: inherit; }
+:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

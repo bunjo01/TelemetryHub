@@ -1,8 +1,9 @@
 {
   "files": {
     "includes": [
-      "**/*.ts",
-      "**/*.tsx",
+      "**/*.js",
+      "**/*.vue",
+      "**/*.html",
       "**/*.json",
       "!**/package-lock.json",
       "!**/dist",
@@ -16,7 +17,21 @@
   },
   "linter": {
     "enabled": true,
-    "rules": { "preset": "none" }
+    "rules": {
+      "preset": "recommended"
+    }
   },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "html": {
+    "experimentalFullSupportEnabled": true,
+    "formatter": {
+      "enabled": true
+    }
+  }
 }

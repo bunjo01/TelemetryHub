@@ -1,30 +1,30 @@
 # IoTMonitor frontend
 
-React with strict TypeScript, Vite, SCSS, and Biome. Use Node.js 24 LTS and npm.
-
-Run from `frontend/`:
+Minimal Vue 3 starter using plain JavaScript, Pinia, Vite, Sass, and Biome.
+Use Node.js 24 LTS and npm.
 
 ```sh
+cd frontend
 npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite (normally http://localhost:5173).
+Open the URL printed by Vite. This starter displays a welcome page and does not require the backend.
 
 ## Commands
 
-```sh
-npm run check       # Biome lint, formatting, and import checks
-npm run check:fix   # Apply safe Biome fixes
-npm run format     # Format supported files
-npm run typecheck  # TypeScript checks
-npm run build      # TypeScript checks and production build into dist/
-npm run preview    # Preview the production build locally
-```
+- `npm run check`: lint and formatting checks.
+- `npm run check:fix`: apply safe Biome fixes.
+- `npm run build`: production build into `dist/`.
+- `npm run preview`: preview the production build.
 
-Edit `src/App.tsx` and `src/App.scss` to start building the UI. Global styles live
-in `src/styles.scss`. Vite compiles SCSS using Sass.
+## Structure
 
-Biome checks TypeScript, TSX, and JSON. SCSS is excluded because Biome does not
-yet provide stable SCSS linting/formatting; the production build validates Sass
-compilation. No backend connection is configured yet.
+- `src/main.js`: Vue application and Pinia setup.
+- `src/App.vue`: minimal welcome page.
+- `src/styles.scss`: global styles.
+- `vite.config.js`: Vue plugin configuration.
+
+No routes, feature stores, API integration, or test runner are configured.
+See [the engineering guide](frontend-engineering-guide.md) for conventions.
+Biome checks JavaScript, Vue, HTML, and JSON; Sass is compiled by Vite.
