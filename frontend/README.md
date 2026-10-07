@@ -11,7 +11,9 @@ npm run dev
 Start FastAPI separately on `127.0.0.1:8000`. Vite forwards `/api/*` to the backend, removing `/api`. Open the URL printed by Vite.
 
 - `/`: login with an existing account.
-- `/profile`: protected landing page after signing in.
+- `/profile`: email, role, sign out and role-specific actions.
+- System administrators can create companies through an inline form.
+- Owner/member invitation buttons are disabled placeholders.
 
 Tokens are held in memory only. Refreshing or closing the page requires another login. Passwords are never persisted. Authentication loads `/auth/me` before entering the profile. The backend enforces permissions.
 
@@ -32,7 +34,7 @@ For production, serve `dist/` with HTTPS, route `/api/*` to FastAPI with the pre
 - `src/api/`: bounded HTTP transport, response validation and domain requests.
 - `src/stores/auth.js`: shared in-memory session and cancellation.
 - `src/router.js`: route access and page titles.
-- `src/views/`: login and a minimal authenticated landing page.
+- `src/views/`: login and profile with local form state.
 - `src/components/`: decorative orbital illustration.
 - `src/styles.scss`: shared styles and design tokens.
 
