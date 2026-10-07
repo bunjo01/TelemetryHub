@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { roleLabels } from "../api/auth.api.js";
 import { createCompany } from "../api/companies.api.js";
+import InviteOwnerDialog from "../components/InviteOwnerDialog.vue";
 import { useAuthStore } from "../stores/auth.js";
 
 const auth = useAuthStore();
@@ -10,6 +11,13 @@ const router = useRouter();
 const isAdmin = computed(() => auth.user?.role === "system_admin");
 const isOwner = computed(() => auth.user?.role === "company_owner");
 const companyDialog = ref(null);
+const isOwnerInvitationOpen = ref(false);
+const inviteButton = ref(null);
+async function closeOwnerInvitation() {
+  isOwnerInvitationOpen.value = false;
+  await nextTick();
+  inviteButton.value?.focus();
+}
 const name = ref("");
 const nameInput = ref(null);
 const createButton = ref(null);
@@ -133,17 +141,28 @@ async function submitCompany() {
             Create company
           </button>
           <button
+            v-if="isAdmin"
+            ref="inviteButton"
+            class="button secondary"
+            type="button"
+            aria-haspopup="dialog"
+            @click="isOwnerInvitationOpen = true"
+          >
+            Invite owner <span aria-hidden="true">↗</span>
+          </button>
+          <button
+            v-else
             class="button secondary"
             type="button"
             disabled
             aria-describedby="invitation-note"
           >
-            {{ isAdmin ? "Invite owner" : "Invite member" }}
+            Invite member
             <span aria-hidden="true">↗</span>
           </button>
         </div>
-        <p v-if="isAdmin || isOwner" id="invitation-note" class="coming-soon">
-          Invitations are coming soon.
+        <p v-if="isOwner" id="invitation-note" class="coming-soon">
+          Member invitations are coming soon.
         </p>
         <p v-if="success" class="message success" role="status">
           {{ success }}
@@ -200,6 +219,10 @@ async function submitCompany() {
         </button>
       </form>
     </dialog>
+    <InviteOwnerDialog
+      v-if="isAdmin && isOwnerInvitationOpen"
+      @close="closeOwnerInvitation"
+    />
   </main>
 </template>
 

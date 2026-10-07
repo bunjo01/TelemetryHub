@@ -13,7 +13,8 @@ Start FastAPI separately on `127.0.0.1:8000`. Vite forwards `/api/*` to the back
 - `/`: login with an existing account.
 - `/profile`: email, role, sign out and role-specific actions.
 - System administrators can create companies through a popup.
-- Owner/member invitation buttons are disabled placeholders.
+- Administrators can invite owners using an email and a searchable company dropdown. The resulting token is displayed once for manual sharing; no email is sent.
+- Member invitations remain a disabled placeholder.
 
 Tokens are held in memory only. Refreshing or closing the page requires another login. Passwords are never persisted. Authentication loads `/auth/me` before entering the profile. The backend enforces permissions.
 

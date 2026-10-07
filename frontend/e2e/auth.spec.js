@@ -31,7 +31,7 @@ test("admin signs in, creates a company and signs out", async ({ page }) => {
   await expect(page.getByText("never-show-this")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Invite owner" }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await page.getByRole("button", { name: "Create company" }).click();
   await expect(page.getByLabel("Company name")).toBeFocused();
   await page.route("**/api/companies", async (route) => {
@@ -204,4 +204,166 @@ test("company popup traps focus, closes with Escape and resets when reopened", a
     .getByRole("button", { name: "Create company", exact: true })
     .click();
   await expect(page.getByLabel("Company name")).toHaveValue("");
+});
+
+test("admin searches and selects a company before inviting its owner", async ({
+  page,
+}) => {
+  await signIn(page);
+  const companyId = "28f63fb6-b64f-4607-bb79-a6e815ab9131";
+  await page.route("**/api/companies?*", (route) => {
+    const query = new URL(route.request().url()).searchParams.get("q");
+    return route.fulfill({
+      json: {
+        items:
+          query === "missing" ? [] : [{ id: companyId, name: "Orbital Labs" }],
+        has_more: false,
+      },
+    });
+  });
+  await page.route(
+    `**/api/companies/${companyId}/owner-invitations`,
+    async (route) => {
+      expect(route.request().postDataJSON()).toEqual({
+        email: "owner@example.com",
+      });
+      await route.fulfill({
+        status: 201,
+        json: {
+          email: "owner@example.com",
+          token: "a".repeat(43),
+          expires_at: "2030-01-01T00:00:00Z",
+        },
+      });
+    },
+  );
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Invite company owner" });
+  await expect(dialog.getByLabel("Owner email address")).toBeFocused();
+  await dialog.getByLabel("Owner email address").fill("owner@example.com");
+  await dialog.locator("summary").click();
+  await dialog.getByLabel("Search companies").fill("missing");
+  await expect(dialog.getByText(/No companies found/)).toBeVisible();
+  await dialog.getByLabel("Search companies").fill("Orbital");
+  await dialog
+    .getByRole("button", { name: "Orbital Labs", exact: true })
+    .click();
+  await expect(dialog.locator("summary")).toContainText("Orbital Labs");
+  await expect(dialog.getByText(companyId)).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Invite owner", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText("Invitation created");
+  await expect(dialog.getByLabel("Invitation token")).toHaveValue(
+    "a".repeat(43),
+  );
+  await expect(dialog.getByText(/No email was sent/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Close invite owner" }).click();
+  await expect(
+    page.getByRole("button", { name: "Invite owner", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  await expect(page.getByLabel("Invitation token")).toHaveCount(0);
+});
+
+test("invitation requires selection and preserves input on conflict", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.route("**/api/companies?*", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          { id: "28f63fb6-b64f-4607-bb79-a6e815ab9131", name: "Orbital Labs" },
+        ],
+        has_more: false,
+      },
+    }),
+  );
+  await page.route("**/owner-invitations", (route) =>
+    route.fulfill({ status: 409, json: {} }),
+  );
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Owner email address").fill("owner@example.com");
+  await dialog
+    .getByRole("button", { name: "Invite owner", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText("Choose a company");
+  await dialog.getByRole("button", { name: "Orbital Labs" }).click();
+  await dialog
+    .getByRole("button", { name: "Invite owner", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText("pending invitation");
+  await expect(dialog.getByLabel("Owner email address")).toHaveValue(
+    "owner@example.com",
+  );
+});
+
+test("company search pages results and ignores obsolete responses", async ({
+  page,
+}, testInfo) => {
+  await signIn(page);
+  let finishOldSearch;
+  let oldSearchStarted;
+  const started = new Promise((resolve) => {
+    oldSearchStarted = resolve;
+  });
+  const company = (name) => ({
+    id: "28f63fb6-b64f-4607-bb79-a6e815ab9131",
+    name,
+  });
+  await page.route("**/api/companies?*", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("q") === "old") {
+      oldSearchStarted();
+      await new Promise((resolve) => {
+        finishOldSearch = resolve;
+      });
+      await route.fulfill({
+        json: { items: [company("Obsolete company")], has_more: false },
+      });
+      return;
+    }
+    const isNext = params.get("offset") === "20";
+    await route.fulfill({
+      json: {
+        items: isNext
+          ? [company("Second company")]
+          : Array.from({ length: 8 }, (_, index) => ({
+              id: `28f63fb6-b64f-4607-bb79-a6e815ab913${index}`,
+              name:
+                index === 0 ? "Orbital Labs" : `Orbital Station ${index + 1}`,
+            })),
+        has_more: !isNext,
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("summary").click();
+  await dialog.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Second company" }),
+  ).toBeVisible();
+  await dialog.getByLabel("Search companies").fill("old");
+  await started;
+  await dialog.getByLabel("Search companies").fill("Orbital");
+  await expect(
+    dialog.getByRole("button", { name: "Orbital Labs" }),
+  ).toBeVisible();
+  finishOldSearch();
+  await expect(
+    dialog.getByRole("button", { name: "Obsolete company" }),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: testInfo.outputPath("invite-owner-mobile.png"),
+    fullPage: true,
+  });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Search companies")).not.toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
 });
