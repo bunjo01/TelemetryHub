@@ -96,7 +96,7 @@ Preferences allow justified exceptions; mandatory safeguards use “must”.
 - Prefer Vitest and Vue Test Utils when meaningful tests are introduced.
 - Test behavior rather than implementation details.
 
-No test runner is configured in this starter. Add one when meaningful behavior needs testing.
+Vitest covers API boundaries and session behavior. Playwright covers critical browser flows with mocked API responses. Run `npm test` and `npm run test:e2e` for these checks.
 
 ## Code Quality
 Biome is the formatter and linter, with recommended rules enabled. Vue/HTML support
