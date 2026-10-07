@@ -227,7 +227,7 @@ async function submitCompany() {
 </template>
 
 <style scoped lang="scss">
-.profile-layout { width: min(1100px, 90%); margin: 0 auto; padding: 4rem 0 5rem; }
+.profile-layout { width: min(1100px, 90%); margin: 0 auto; padding: clamp(1.5rem, 4svh, 4rem) 0; }
 .page-heading { margin-bottom: 2.8rem; }
 h1 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 450; letter-spacing: -.045em; margin: .8rem 0; }
 h2 { font-size: 1.5rem; font-weight: 500; letter-spacing: -.025em; }
@@ -254,4 +254,15 @@ dl { margin: 2rem 0 0; } dl > div { padding: 1.3rem 0; border-top: 1px solid var
 .company-form .message { margin: 0; }
 .workspace-art { position: relative; height: 130px; opacity: .55; pointer-events: none; margin-top: 2rem; } .ring { position: absolute; border: 1px solid #72b5bb44; width: 320px; height: 140px; border-radius: 50%; right: -60px; top: 20px; transform: rotate(-25deg); } .ring-two { transform: rotate(25deg); border-style: dashed; } .workspace-art > span { position: absolute; right: 60px; top: 35px; font-size: 3rem; color: var(--accent); } .workspace-art i { position: absolute; right: 220px; top: 105px; border-radius: 50%; width: 6px; height: 6px; background: var(--accent); box-shadow: 0 0 20px var(--accent); }
 @media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; } .profile-layout { padding-top: 2.5rem; } .identity, .workspace { padding: 1.5rem; } }
+@media (min-width: 701px) and (max-height: 900px) {
+  .profile-layout { margin-block: auto; padding-block: 1.25rem; }
+  .page-heading { margin-bottom: 1.5rem; }
+  .page-heading h1 { font-size: 2.25rem; margin-block: .5rem; }
+  .identity, .workspace { padding: 1.5rem; }
+  .avatar { width: 4rem; height: 4rem; margin-bottom: 1rem; }
+  dl { margin-top: 1.25rem; }
+  dl > div { padding-block: 1rem; }
+  .workspace { min-height: 0; }
+  .workspace-art { height: 85px; margin-top: 1rem; }
+}
 </style>

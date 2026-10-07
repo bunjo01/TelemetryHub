@@ -101,7 +101,7 @@ async function submit() {
 </template>
 
 <style scoped lang="scss">
-.login-layout { width: min(1160px, 90%); margin: auto; padding: 4rem 0; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 5rem; }
+.login-layout { width: min(1160px, 90%); margin: auto; padding: clamp(1rem, 3svh, 3rem) 0; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 5rem; }
 .intro h2 { font-size: clamp(2.7rem, 5vw, 4.6rem); font-weight: 450; line-height: 1.08; letter-spacing: -.055em; margin: 1.5rem 0; }
 .intro h2 span { color: var(--accent); }
 .intro-copy { color: var(--muted); font-size: 1rem; line-height: 1.8; }
@@ -116,4 +116,17 @@ input { margin: .6rem 0 1.4rem; }
 .panel-bottom { border-top: 1px solid var(--line); padding-top: 1.5rem; color: var(--muted); font-size: .6rem; letter-spacing: .13em; display: flex; align-items: center; gap: .6rem; }
 @media (max-width: 850px) { .login-layout { gap: 2rem; } .login-panel { padding: 1.75rem; } }
 @media (max-width: 680px) { .login-layout { grid-template-columns: 1fr; max-width: 440px; padding: 2.5rem 0; } .intro { display: none; } }
+@media (min-width: 681px) and (max-height: 900px) {
+  .login-panel { padding: 1.5rem 2rem; }
+  .panel-marker { margin-bottom: 1rem; width: 2.4rem; height: 2.4rem; }
+  form { margin-top: 1.25rem; }
+  input { margin: .4rem 0 1rem; }
+  .access-note { margin: 1rem 0; }
+  .panel-bottom { padding-top: 1rem; }
+  .intro h2 { font-size: clamp(2.7rem, 4vw, 3.6rem); margin-block: 1rem; }
+  .intro :deep(.orbit) { max-height: 28svh; margin-top: 0; }
+}
+@media (min-width: 681px) and (max-height: 740px) {
+  .panel-marker, .panel-bottom { display: none; }
+}
 </style>
