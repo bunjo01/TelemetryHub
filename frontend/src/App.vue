@@ -1,18 +1,26 @@
 <script setup>
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "./stores/auth.js";
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+function focusMain() {
+  const main = document.getElementById("main");
+  main?.setAttribute("tabindex", "-1");
+  main?.focus();
+}
 function signOut() {
   auth.logout();
-  router.replace({ name: "login" });
+  if (route.name !== "register") router.replace({ name: "login" });
 }
 </script>
 
 <template>
   <div class="universe">
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main" @click.prevent="focusMain"
+      >Skip to content</a
+    >
     <header class="site-header">
       <RouterLink
         class="brand"

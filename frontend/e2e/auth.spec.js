@@ -281,9 +281,44 @@ test("admin searches and selects a company before inviting its owner", async ({
   await dialog
     .getByRole("button", { name: "Invite owner", exact: true })
     .click();
-  await expect(dialog.getByRole("status")).toContainText("Invitation created");
-  await expect(dialog.getByLabel("Invitation token")).toHaveValue(
-    "a".repeat(43),
+  await expect(
+    dialog.getByRole("status").filter({ hasText: "Invitation created" }),
+  ).toContainText("Invitation created");
+  await expect(dialog.getByLabel("Invitation link")).toHaveValue(
+    `http://127.0.0.1:4173/register#token=${"a".repeat(43)}`,
+  );
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new Error("denied");
+        },
+      },
+    }),
+  );
+  await dialog.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(
+    dialog
+      .getByRole("status")
+      .filter({ hasText: /Select the link and copy it manually/ }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (value) => {
+          window.copiedLink = value;
+        },
+      },
+    }),
+  );
+  await dialog.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(
+    dialog.getByRole("status").filter({ hasText: "Invitation link copied." }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.copiedLink)).toBe(
+    `http://127.0.0.1:4173/register#token=${"a".repeat(43)}`,
   );
   await expect(dialog.getByText(/No email was sent/)).toBeVisible();
   await dialog.getByRole("button", { name: "Close invite owner" }).click();
@@ -291,7 +326,7 @@ test("admin searches and selects a company before inviting its owner", async ({
     page.getByRole("button", { name: "Invite owner", exact: true }),
   ).toBeFocused();
   await page.getByRole("button", { name: "Invite owner", exact: true }).click();
-  await expect(page.getByLabel("Invitation token")).toHaveCount(0);
+  await expect(page.getByLabel("Invitation link")).toHaveCount(0);
 });
 
 test("invitation requires selection and preserves input on conflict", async ({
@@ -394,4 +429,80 @@ test("company search pages results and ignores obsolete responses", async ({
   await expect(dialog.getByLabel("Search companies")).not.toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
+});
+
+test("copy feedback stays beside the button without resizing the modal", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.route("**/api/companies?*", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          { id: "28f63fb6-b64f-4607-bb79-a6e815ab9131", name: "Orbital Labs" },
+        ],
+        has_more: false,
+      },
+    }),
+  );
+  await page.route("**/owner-invitations", (route) =>
+    route.fulfill({
+      status: 201,
+      json: {
+        email: "owner@example.com",
+        token: "a".repeat(43),
+        expires_at: "2030-01-01T00:00:00Z",
+      },
+    }),
+  );
+  for (const width of [1280, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page
+      .getByRole("button", { name: "Invite owner", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Owner email address").fill("owner@example.com");
+    await dialog.locator("summary").click();
+    await dialog.getByRole("button", { name: "Orbital Labs" }).click();
+    await dialog
+      .getByRole("button", { name: "Invite owner", exact: true })
+      .click();
+    const button = dialog.getByRole("button", {
+      name: "Copy link",
+      exact: true,
+    });
+    await expect(button).toBeVisible();
+    const before = await dialog.boundingBox();
+    for (const fails of [false, true]) {
+      await page.evaluate(
+        (fails) =>
+          Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: {
+              writeText: async () => {
+                if (fails) throw new Error("denied");
+              },
+            },
+          }),
+        fails,
+      );
+      await button.click();
+      const feedback = dialog.locator(".copy-feedback [role=status]");
+      await expect(feedback).toContainText(
+        fails ? "Select the link" : "Invitation link copied.",
+      );
+      expect(await dialog.boundingBox()).toEqual(before);
+      const buttonBox = await button.boundingBox();
+      const feedbackBox = await feedback.boundingBox();
+      expect(feedbackBox.x).toBeGreaterThanOrEqual(
+        buttonBox.x + buttonBox.width,
+      );
+      expect(before.x).toBeGreaterThanOrEqual(0);
+      expect(before.x + before.width).toBeLessThanOrEqual(width);
+      expect(
+        await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      ).toBe(true);
+    }
+    await dialog.getByRole("button", { name: "Close invite owner" }).click();
+  }
 });

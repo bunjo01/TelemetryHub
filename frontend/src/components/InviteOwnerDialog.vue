@@ -1,5 +1,12 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRouter } from "vue-router";
 import { searchCompanies } from "../api/companies.api.js";
 import { inviteOwner } from "../api/invitations.api.js";
@@ -23,6 +30,26 @@ const isSaving = ref(false);
 const searchError = ref("");
 const error = ref("");
 const invitation = ref(null);
+const copyMessage = ref("");
+const copySuccessMessage = "Invitation link copied.";
+const copyFailureMessage =
+  "Unable to copy automatically. Select the link and copy it manually.";
+const invitationLink = computed(() => {
+  if (!invitation.value) return "";
+  const href = router.resolve({
+    name: "register",
+    hash: `#token=${invitation.value.token}`,
+  }).href;
+  return new URL(href, window.location.origin).href;
+});
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(invitationLink.value);
+    if (!isDisposed) copyMessage.value = copySuccessMessage;
+  } catch {
+    if (!isDisposed) copyMessage.value = copyFailureMessage;
+  }
+}
 let searchRequest;
 let invitationRequest;
 let debounce;
@@ -170,17 +197,33 @@ async function submit() {
         Invitation created for {{ invitation.email }} at {{ selected.name }}.
       </p>
       <p class="muted">
-        No email was sent. Share this invitation token with the owner. It is
-        only available here until you close this popup.
+        No email was sent. Share this invitation link with the owner. It is only
+        available here until you close this popup.
       </p>
-      <label for="owner-token">Invitation token</label>
+      <label for="owner-link">Invitation link</label>
       <textarea
-        id="owner-token"
-        :value="invitation.token"
+        id="owner-link"
+        :value="invitationLink"
         readonly
         rows="3"
         spellcheck="false"
       />
+      <div class="copy-actions">
+        <button class="button secondary" type="button" @click="copyLink">
+          Copy link
+        </button>
+        <div class="copy-feedback">
+          <span class="copy-placeholder" aria-hidden="true">{{
+            copySuccessMessage
+          }}</span>
+          <span class="copy-placeholder" aria-hidden="true">{{
+            copyFailureMessage
+          }}</span>
+          <p role="status" aria-live="polite" aria-atomic="true">
+            {{ copyMessage }}
+          </p>
+        </div>
+      </div>
       <p class="muted">
         Expires {{ new Date(invitation.expiresAt).toLocaleString() }}.
       </p>
@@ -372,6 +415,13 @@ summary::-webkit-details-marker { display: none; }
 .company-node { color: var(--accent); flex-shrink: 0; text-shadow: 0 0 10px #9be5d566; }
 .company-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .875rem; }
 .pagination { display: flex; justify-content: space-between; gap: .5rem; }
-textarea { display: block; width: 100%; margin-top: .5rem; background: #09121e; color: var(--text); border: 1px solid var(--line); border-radius: .5rem; padding: .75rem; resize: vertical; font: inherit; }
+textarea { display: block; width: 100%; margin: .5rem 0 1rem; background: #09121e; color: var(--text); border: 1px solid var(--line); border-radius: .5rem; padding: .75rem; resize: vertical; font: inherit; }
 .invitation-result { overflow-wrap: anywhere; }
+.copy-actions { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: .75rem; }
+.copy-feedback { display: grid; min-width: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
+.copy-feedback > * { grid-area: 1 / 1; margin: 0; align-self: center; }
+// Reserve the space required by either outcome, even before the first copy attempt.
+.copy-placeholder { visibility: hidden; }
+// This section receives focus to announce the result; controls retain their focus rings.
+.invitation-result:focus { outline: none; }
 </style>

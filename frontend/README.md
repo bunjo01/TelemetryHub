@@ -13,10 +13,13 @@ Start FastAPI separately on `127.0.0.1:8000`. Vite forwards `/api/*` to the back
 - `/`: login with an existing account.
 - `/profile`: email, role, sign out and role-specific actions.
 - System administrators can create companies through a popup.
-- Administrators can invite owners using an email and a searchable company dropdown. The resulting token is displayed once for manual sharing; no email is sent.
+- Administrators can invite owners using an email and a searchable company dropdown. The resulting registration link has a Copy link button and manual-copy fallback; no email is sent.
+- `/register#token=...`: invitation-based registration with read-only email, password and confirmation. Successful registration returns to login. Owner and member invitations use the same form.
 - Member invitations remain a disabled placeholder.
 
-Tokens are held in memory only. Refreshing or closing the page requires another login. Passwords are never persisted. Authentication loads `/auth/me` before entering the profile. The backend enforces permissions.
+Login tokens are held in memory only. Refreshing or closing the page requires another login. Passwords are never persisted. Authentication loads `/auth/me` before entering the profile. The backend enforces permissions.
+
+Invitation secrets remain in the registration URL fragment until registration succeeds, so refreshing works. They are not stored in local/session storage or sent in API URLs; preview and acceptance send the token in a JSON body. Share the link only with its intended recipient. Signed-in visitors must explicitly sign out before registering.
 
 ## Commands
 
@@ -35,7 +38,7 @@ For production, serve `dist/` with HTTPS, route `/api/*` to FastAPI with the pre
 - `src/api/`: bounded HTTP transport, response validation and domain requests.
 - `src/stores/auth.js`: shared in-memory session and cancellation.
 - `src/router.js`: route access and page titles.
-- `src/views/`: login and profile with local form state.
+- `src/views/`: login, registration and profile with local form state.
 - `src/components/`: decorative orbital illustration.
 - `src/styles.scss`: shared styles and design tokens.
 

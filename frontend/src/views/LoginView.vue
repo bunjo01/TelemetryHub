@@ -56,6 +56,13 @@ async function submit() {
       <p class="eyebrow">WELCOME ABOARD</p>
       <h1 id="login-title" tabindex="-1">Sign in to your space.</h1>
       <p class="muted">Enter your details to access TelemetryHub.</p>
+      <p
+        v-if="route.query.registered === '1'"
+        class="message success"
+        role="status"
+      >
+        Account created. Sign in with your new password.
+      </p>
       <form @submit.prevent="submit" :aria-busy="isLoading">
         <label for="email">Email address</label>
         <input
