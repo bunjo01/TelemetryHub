@@ -42,6 +42,21 @@ def require_usable_invitation(
     return invitation
 
 
+@dataclass(frozen=True)
+class InvitationPreview:
+    email: str
+    expires_at: datetime
+
+
+def preview_invitation(session: Session, token: str) -> InvitationPreview:
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    with session.begin():
+        invitation = require_usable_invitation(
+            repository.find_invitation(session, token_hash), datetime.now(UTC)
+        )
+        return InvitationPreview(invitation.email, invitation.expires_at)
+
+
 def accept_invitation(session: Session, token: str, password: str) -> CurrentUser:
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     # Reject unusable tokens before paying the password-hashing cost.

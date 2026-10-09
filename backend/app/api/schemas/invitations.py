@@ -44,3 +44,14 @@ class MemberInvitationResponse(BaseModel):
     role: Literal["member"] = "member"
     expires_at: datetime
     token: str = Field(repr=False)
+
+
+class PreviewInvitationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: SecretStr = Field(min_length=43, max_length=43)
+
+
+class PreviewInvitationResponse(BaseModel):
+    email: str
+    expires_at: datetime

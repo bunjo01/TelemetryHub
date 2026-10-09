@@ -19,6 +19,8 @@ from app.api.schemas.invitations import (
     CreateInvitationRequest,
     MemberInvitationResponse,
     OwnerInvitationResponse,
+    PreviewInvitationRequest,
+    PreviewInvitationResponse,
 )
 from app.application.invitations import (
     CompanyNotFoundError,
@@ -28,6 +30,7 @@ from app.application.invitations import (
     accept_invitation,
     create_member_invitation,
     create_owner_invitation,
+    preview_invitation,
 )
 from app.config import Settings
 from app.infrastructure.repositories.users import CurrentUser
@@ -175,3 +178,34 @@ def create_owner_invitation_endpoint(
         expires_at=invitation.expires_at,
         token=invitation.token,
     )
+
+
+@acceptance_router.post(
+    "/preview",
+    response_model=PreviewInvitationResponse,
+    responses={
+        400: {"description": "Invalid, expired, or used invitation"},
+        503: {"description": "Invitation preview unavailable"},
+    },
+)
+def preview_invitation_endpoint(
+    payload: PreviewInvitationRequest,
+    response: Response,
+    session: Annotated[Session, Depends(get_database_session)],
+) -> PreviewInvitationResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        preview = preview_invitation(
+            session=session, token=payload.token.get_secret_value()
+        )
+    except InvalidInvitationError:
+        raise HTTPException(
+            400, "Invalid or expired invitation.", headers={"Cache-Control": "no-store"}
+        ) from None
+    except (OperationalError, SQLAlchemyTimeoutError):
+        raise HTTPException(
+            503,
+            "Invitation preview temporarily unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    return PreviewInvitationResponse(email=preview.email, expires_at=preview.expires_at)

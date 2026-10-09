@@ -171,6 +171,21 @@ def seed_invitation(
     return invitation, token
 
 
+@pytest.mark.parametrize("role", ["company_owner", "member"])
+def test_postgres_preview_does_not_consume(
+    database_session: Session, role: str
+) -> None:
+    invitation, token = seed_invitation(database_session, role)
+    for _ in range(2):
+        preview = application.preview_invitation(database_session, token)
+        assert preview.email == invitation.email
+        assert preview.expires_at == invitation.expires_at
+    user = application.accept_invitation(database_session, token, PASSWORD)
+    assert user.role == role
+    with pytest.raises(application.InvalidInvitationError):
+        application.preview_invitation(database_session, token)
+
+
 def test_postgres_acceptance_and_reuse(database_session: Session) -> None:
     invitation, token = seed_invitation(database_session)
     user = application.accept_invitation(database_session, token, PASSWORD)

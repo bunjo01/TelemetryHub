@@ -43,7 +43,11 @@ app = FastAPI(title="IoTMonitor API", lifespan=lifespan)
 async def handle_request_validation_error(
     request: Request, error: RequestValidationError
 ) -> JSONResponse:
-    return JSONResponse(status_code=422, content={"detail": "Invalid request data."})
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Invalid request data."},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 app.include_router(health_router)
