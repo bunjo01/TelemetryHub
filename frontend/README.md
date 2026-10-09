@@ -15,7 +15,7 @@ Start FastAPI separately on `127.0.0.1:8000`. Vite forwards `/api/*` to the back
 - System administrators can create companies through a popup.
 - Administrators can invite owners using an email and a searchable company dropdown. The resulting registration link has a Copy link button and manual-copy fallback; no email is sent.
 - `/register#token=...`: invitation-based registration with read-only email, password and confirmation. Successful registration returns to login. Owner and member invitations use the same form.
-- Member invitations remain a disabled placeholder.
+- Company owners can invite members through an email-only popup. Their company is selected automatically; they can copy and share the resulting registration link.
 
 Login tokens are held in memory only. Refreshing or closing the page requires another login. Passwords are never persisted. Authentication loads `/auth/me` before entering the profile. The backend enforces permissions.
 

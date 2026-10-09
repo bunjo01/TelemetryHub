@@ -9,9 +9,17 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import { searchCompanies } from "../api/companies.api.js";
-import { inviteOwner } from "../api/invitations.api.js";
+import { inviteMember, inviteOwner } from "../api/invitations.api.js";
 import { useAuthStore } from "../stores/auth.js";
 
+const props = defineProps({
+  recipient: {
+    type: String,
+    required: true,
+    validator: (value) => ["owner", "member"].includes(value),
+  },
+});
+const isOwnerInvitation = computed(() => props.recipient === "owner");
 const emit = defineEmits(["close"]);
 const auth = useAuthStore();
 const router = useRouter();
@@ -58,7 +66,7 @@ let isDisposed = false;
 onMounted(() => {
   dialog.value.showModal();
   emailInput.value.focus();
-  loadCompanies(0);
+  if (isOwnerInvitation.value) loadCompanies(0);
 });
 onBeforeUnmount(() => {
   isDisposed = true;
@@ -137,25 +145,29 @@ function escapeDropdown(event) {
 async function submit() {
   if (isSaving.value) return;
   error.value = "";
-  if (!selected.value) {
+  if (isOwnerInvitation.value && !selected.value) {
     error.value = "Choose a company from the dropdown.";
     dropdown.value.open = true;
     return;
   }
   isSaving.value = true;
-  dropdown.value.open = false;
+  if (dropdown.value) dropdown.value.open = false;
   searchRequest?.abort();
   clearTimeout(debounce);
   const controller = new AbortController();
   invitationRequest = controller;
   try {
-    invitation.value = await inviteOwner(
-      selected.value.id,
+    const createInvitation = isOwnerInvitation.value
+      ? inviteOwner
+      : inviteMember;
+    const result = await createInvitation(
+      isOwnerInvitation.value ? selected.value.id : auth.user.companyId,
       email.value,
       auth.token,
       controller.signal,
     );
-    if (isDisposed) return;
+    if (controller.signal.aborted || isDisposed) return;
+    invitation.value = result;
     await nextTick();
     dialog.value.querySelector(".invitation-result")?.focus();
   } catch (failure) {
@@ -172,15 +184,17 @@ async function submit() {
   <dialog
     ref="dialog"
     class="panel owner-dialog"
-    aria-labelledby="owner-title"
+    aria-labelledby="invitation-title"
     @cancel.prevent="close"
   >
     <div class="dialog-heading">
-      <h2 id="owner-title">Invite company owner</h2>
+      <h2 id="invitation-title">
+        {{ isOwnerInvitation ? "Invite company owner" : "Invite member" }}
+      </h2>
       <button
         class="close-button"
         type="button"
-        aria-label="Close invite owner"
+        :aria-label="`Close invite ${recipient}`"
         :disabled="isSaving"
         @click="close"
       >
@@ -194,15 +208,16 @@ async function submit() {
       aria-label="Invitation created"
     >
       <p class="message success" role="status">
-        Invitation created for {{ invitation.email }} at {{ selected.name }}.
+        Invitation created for {{ invitation.email
+        }}<template v-if="isOwnerInvitation"> at {{ selected.name }}</template>.
       </p>
       <p class="muted">
-        No email was sent. Share this invitation link with the owner. It is only
-        available here until you close this popup.
+        No email was sent. Share this invitation link with the {{ recipient }}.
+        It is only available here until you close this popup.
       </p>
-      <label for="owner-link">Invitation link</label>
+      <label for="invitation-link">Invitation link</label>
       <textarea
-        id="owner-link"
+        id="invitation-link"
         :value="invitationLink"
         readonly
         rows="3"
@@ -229,21 +244,29 @@ async function submit() {
       </p>
     </section>
     <form v-else @submit.prevent="submit" :aria-busy="isSaving">
-      <label for="owner-email">Owner email address</label>
+      <label for="invitation-email">{{
+        isOwnerInvitation ? "Owner email address" : "Member email address"
+      }}</label>
       <input
-        id="owner-email"
+        id="invitation-email"
         ref="emailInput"
         v-model="email"
         type="email"
         required
         maxlength="254"
         autocomplete="email"
-        placeholder="owner@company.com"
+        :placeholder="`${recipient}@company.com`"
         :readonly="isSaving"
-        :aria-describedby="error ? 'owner-error' : undefined"
+        :aria-describedby="error ? 'invitation-error' : undefined"
       >
-      <span id="company-picker-label" class="field-label">Company</span>
+      <span
+        v-if="isOwnerInvitation"
+        id="company-picker-label"
+        class="field-label"
+        >Company</span
+      >
       <details
+        v-if="isOwnerInvitation"
         ref="dropdown"
         class="company-picker"
         @toggle="onDropdownToggle"
@@ -329,11 +352,11 @@ async function submit() {
           </template>
         </div>
       </details>
-      <p v-if="error" id="owner-error" class="message error" role="alert">
+      <p v-if="error" id="invitation-error" class="message error" role="alert">
         {{ error }}
       </p>
       <button class="button primary" type="submit" :disabled="isSaving">
-        {{ isSaving ? "Creating invitation…" : "Invite owner" }}
+        {{ isSaving ? "Creating invitation…" : `Invite ${recipient}` }}
       </button>
     </form>
   </dialog>

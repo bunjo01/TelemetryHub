@@ -12,6 +12,7 @@ async function signIn(page, role = "system_admin") {
         id: "never-show-this",
         email: "crew@example.com",
         role,
+        company_id: "11111111-1111-4111-8111-111111111111",
         status: "active",
       },
     }),
@@ -67,7 +68,7 @@ for (const role of ["company_owner", "member"]) {
     if (role === "company_owner")
       await expect(
         page.getByRole("button", { name: "Invite member" }),
-      ).toBeDisabled();
+      ).toBeEnabled();
     else
       await expect(
         page.getByRole("button", { name: "Invite member" }),
@@ -505,4 +506,124 @@ test("copy feedback stays beside the button without resizing the modal", async (
     }
     await dialog.getByRole("button", { name: "Close invite owner" }).click();
   }
+});
+
+test("owner invites a member into their own company and shares a registration link", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  let companySearches = 0;
+  await page.route("**/api/companies?**", (route) => {
+    companySearches++;
+    return route.fulfill({ json: { items: [], has_more: false } });
+  });
+  await signIn(page, "company_owner");
+  await page
+    .getByRole("button", { name: "Invite member", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Invite member" });
+  await expect(dialog.getByLabel("Member email address")).toBeFocused();
+  await expect(dialog.getByText("Company", { exact: true })).toHaveCount(0);
+  let requests = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    "**/api/companies/11111111-1111-4111-8111-111111111111/member-invitations",
+    async (route) => {
+      requests++;
+      expect(route.request().postDataJSON()).toEqual({
+        email: "member@example.com",
+      });
+      expect(route.request().headers().authorization).toBe("Bearer test-token");
+      await gate;
+      await route.fulfill({
+        status: 201,
+        json: {
+          email: "member@example.com",
+          token: "m".repeat(43),
+          expires_at: "2027-01-01T00:00:00Z",
+        },
+      });
+    },
+  );
+  await dialog.getByLabel("Member email address").fill("Member@Example.com");
+  await dialog
+    .getByRole("button", { name: "Invite member", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Creating invitation…" }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  release();
+  const link = dialog.getByLabel("Invitation link");
+  await expect(link).toHaveValue(/\/register#token=m{43}$/);
+  const before = await dialog.boundingBox();
+  await dialog.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(
+    dialog
+      .getByText("Invitation link copied.", { exact: true })
+      .filter({ visible: true }),
+  ).toBeVisible();
+  expect(await dialog.boundingBox()).toEqual(before);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    await link.inputValue(),
+  );
+  expect(requests).toBe(1);
+  expect(companySearches).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Invite member", exact: true }),
+  ).toBeFocused();
+  await page
+    .getByRole("button", { name: "Invite member", exact: true })
+    .click();
+  await expect(dialog.getByLabel("Member email address")).toHaveValue("");
+  await expect(dialog.getByLabel("Invitation link")).toHaveCount(0);
+});
+
+test("member invitation errors preserve input and expired sessions return to login", async ({
+  page,
+}) => {
+  await signIn(page, "company_owner");
+  await page
+    .getByRole("button", { name: "Invite member", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Invite member" });
+  await dialog.getByLabel("Member email address").fill("member@example.com");
+  for (const [status, message] of [
+    [409, "already has an account or a pending invitation"],
+    [403, "do not have permission"],
+    [404, "company is no longer available"],
+    [503, "temporarily unavailable"],
+  ]) {
+    await page.route("**/member-invitations", (route) =>
+      route.fulfill({ status, json: { detail: "private server details" } }),
+    );
+    await dialog
+      .getByRole("button", { name: "Invite member", exact: true })
+      .click();
+    await expect(dialog.getByRole("alert")).toContainText(message);
+    await expect(dialog.getByLabel("Member email address")).toHaveValue(
+      "member@example.com",
+    );
+    await expect(dialog.getByText("private server details")).toHaveCount(0);
+  }
+  await page.route("**/member-invitations", (route) =>
+    route.fulfill({ status: 401, json: {} }),
+  );
+  await dialog
+    .getByRole("button", { name: "Invite member", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\?expired=1$/);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

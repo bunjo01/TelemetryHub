@@ -20,6 +20,33 @@ export async function inviteOwner(companyId, email, token, signal) {
       );
     throw error;
   }
+  return readCreatedInvitation(data);
+}
+
+export async function inviteMember(companyId, email, token, signal) {
+  let data;
+  try {
+    data = await request(
+      `/companies/${encodeURIComponent(companyId)}/member-invitations`,
+      { token, body: { email: email.trim().toLowerCase() }, signal },
+    );
+  } catch (error) {
+    if (error.status === 409)
+      throw new ApiError(
+        "This email already has an account or a pending invitation. Check the email before trying again.",
+        409,
+      );
+    if (error.status === 404)
+      throw new ApiError(
+        "Your company is no longer available. Contact your administrator.",
+        404,
+      );
+    throw error;
+  }
+  return readCreatedInvitation(data);
+}
+
+function readCreatedInvitation(data) {
   if (
     typeof data?.token !== "string" ||
     !/^[A-Za-z0-9_-]{43}$/.test(data.token) ||

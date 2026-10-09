@@ -32,6 +32,18 @@ export async function getProfile(token, signal) {
     !Object.hasOwn(roleLabels, data.role)
   )
     throw invalidResponse();
+  if (
+    data.role === "company_owner" &&
+    (typeof data.company_id !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        data.company_id,
+      ))
+  )
+    throw invalidResponse();
   // Only retain the fields this interface needs; IDs and status are not displayed.
-  return { email: data.email, role: data.role };
+  return {
+    email: data.email,
+    role: data.role,
+    ...(data.role === "company_owner" ? { companyId: data.company_id } : {}),
+  };
 }

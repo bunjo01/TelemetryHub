@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { roleLabels } from "../api/auth.api.js";
 import { createCompany } from "../api/companies.api.js";
-import InviteOwnerDialog from "../components/InviteOwnerDialog.vue";
+import InviteUserDialog from "../components/InviteUserDialog.vue";
 import { useAuthStore } from "../stores/auth.js";
 
 const auth = useAuthStore();
@@ -11,10 +11,10 @@ const router = useRouter();
 const isAdmin = computed(() => auth.user?.role === "system_admin");
 const isOwner = computed(() => auth.user?.role === "company_owner");
 const companyDialog = ref(null);
-const isOwnerInvitationOpen = ref(false);
+const isInvitationOpen = ref(false);
 const inviteButton = ref(null);
-async function closeOwnerInvitation() {
-  isOwnerInvitationOpen.value = false;
+async function closeInvitation() {
+  isInvitationOpen.value = false;
   await nextTick();
   inviteButton.value?.focus();
 }
@@ -146,24 +146,22 @@ async function submitCompany() {
             class="button secondary"
             type="button"
             aria-haspopup="dialog"
-            @click="isOwnerInvitationOpen = true"
+            @click="isInvitationOpen = true"
           >
             Invite owner <span aria-hidden="true">↗</span>
           </button>
           <button
             v-else
+            ref="inviteButton"
             class="button secondary"
             type="button"
-            disabled
-            aria-describedby="invitation-note"
+            aria-haspopup="dialog"
+            @click="isInvitationOpen = true"
           >
             Invite member
             <span aria-hidden="true">↗</span>
           </button>
         </div>
-        <p v-if="isOwner" id="invitation-note" class="coming-soon">
-          Member invitations are coming soon.
-        </p>
         <p v-if="success" class="message success" role="status">
           {{ success }}
         </p>
@@ -219,9 +217,10 @@ async function submitCompany() {
         </button>
       </form>
     </dialog>
-    <InviteOwnerDialog
-      v-if="isAdmin && isOwnerInvitationOpen"
-      @close="closeOwnerInvitation"
+    <InviteUserDialog
+      v-if="(isAdmin || isOwner) && isInvitationOpen"
+      :recipient="isAdmin ? 'owner' : 'member'"
+      @close="closeInvitation"
     />
   </main>
 </template>
@@ -242,7 +241,6 @@ dl { margin: 2rem 0 0; } dl > div { padding: 1.3rem 0; border-top: 1px solid var
 .section-icon { font-size: 1.4rem; color: var(--accent); }
 .workspace-description { max-width: 27rem; line-height: 1.8; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
-.coming-soon { font-size: .75rem; color: var(--muted); }
 .company-dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100svh - 2rem); padding: 1.75rem; color: var(--text); }
 .company-dialog::backdrop { background: #030810b8; backdrop-filter: blur(5px); }
 .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
