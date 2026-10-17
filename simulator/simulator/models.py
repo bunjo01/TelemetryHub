@@ -40,6 +40,7 @@ class DeviceConfiguration:
     enabled_sensors: tuple[SensorType, ...]
     firmware_version: str | None = None
 
+
 @dataclass(frozen=True)
 class Device:
     id: UUID
@@ -56,11 +57,13 @@ class Location:
     location_type: LocationType
     devices: tuple[Device, ...]
 
+
 @dataclass(frozen=True)
 class Company:
     id: UUID
     name: str
     locations: tuple[Location, ...]
+
 
 @dataclass(frozen=True)
 class SeedData:
