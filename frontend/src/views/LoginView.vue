@@ -1,6 +1,8 @@
 <script setup>
 import { onBeforeUnmount, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import BaseButton from "../components/BaseButton.vue";
+import BaseInput from "../components/BaseInput.vue";
 import OrbitIllustration from "../components/OrbitIllustration.vue";
 import { useAuthStore } from "../stores/auth.js";
 
@@ -65,7 +67,7 @@ async function submit() {
       </p>
       <form @submit.prevent="submit" :aria-busy="isLoading">
         <label for="email">Email address</label>
-        <input
+        <BaseInput
           id="email"
           v-model="email"
           type="email"
@@ -75,9 +77,9 @@ async function submit() {
           maxlength="254"
           :readonly="isLoading"
           :aria-describedby="error ? 'login-error' : undefined"
-        >
+        />
         <label for="password">Password</label>
-        <input
+        <BaseInput
           id="password"
           v-model="password"
           type="password"
@@ -87,14 +89,19 @@ async function submit() {
           maxlength="128"
           :readonly="isLoading"
           :aria-describedby="error ? 'login-error' : undefined"
-        >
+        />
         <p v-if="error" id="login-error" class="message error" role="alert">
           {{ error }}
         </p>
-        <button class="button primary" type="submit" :disabled="isLoading">
+        <BaseButton
+          class="primary"
+          variant="primary"
+          type="submit"
+          :disabled="isLoading"
+        >
           {{ isLoading ? "Signing in…" : "Sign in"
           }}<span aria-hidden="true">→</span>
-        </button>
+        </BaseButton>
       </form>
       <p class="access-note">
         New to this space? Your administrator or company owner can invite you.

@@ -1,8 +1,10 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { roleLabels } from "../api/auth.api.js";
 import { createCompany } from "../api/companies.api.js";
+import BaseButton from "../components/BaseButton.vue";
+import BaseInput from "../components/BaseInput.vue";
 import InviteUserDialog from "../components/InviteUserDialog.vue";
 import { useAuthStore } from "../stores/auth.js";
 
@@ -12,15 +14,11 @@ const isAdmin = computed(() => auth.user?.role === "system_admin");
 const isOwner = computed(() => auth.user?.role === "company_owner");
 const companyDialog = ref(null);
 const isInvitationOpen = ref(false);
-const inviteButton = ref(null);
-async function closeInvitation() {
+function closeInvitation() {
   isInvitationOpen.value = false;
-  await nextTick();
-  inviteButton.value?.focus();
 }
 const name = ref("");
 const nameInput = ref(null);
-const createButton = ref(null);
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
@@ -34,11 +32,9 @@ function openCompanyDialog() {
   companyDialog.value.showModal();
   nameInput.value?.focus();
 }
-async function closeCompanyDialog() {
+function closeCompanyDialog() {
   if (isSaving.value) return;
   companyDialog.value.close();
-  await nextTick();
-  createButton.value?.focus();
 }
 async function submitCompany() {
   if (isSaving.value) return;
@@ -127,11 +123,11 @@ async function submitCompany() {
           }}
         </p>
         <div v-if="isAdmin || isOwner" class="actions">
-          <button
+          <BaseButton
             v-if="isAdmin"
-            ref="createButton"
             type="button"
-            class="button primary"
+            class="primary"
+            variant="primary"
             :disabled="isSaving"
             aria-haspopup="dialog"
             aria-controls="company-dialog"
@@ -139,28 +135,28 @@ async function submitCompany() {
           >
             <span aria-hidden="true">＋</span>
             Create company
-          </button>
-          <button
+          </BaseButton>
+          <BaseButton
             v-if="isAdmin"
-            ref="inviteButton"
-            class="button secondary"
+            class="secondary"
+            variant="secondary"
             type="button"
             aria-haspopup="dialog"
             @click="isInvitationOpen = true"
           >
             Invite owner <span aria-hidden="true">↗</span>
-          </button>
-          <button
+          </BaseButton>
+          <BaseButton
             v-else
-            ref="inviteButton"
-            class="button secondary"
+            class="secondary"
+            variant="secondary"
             type="button"
             aria-haspopup="dialog"
             @click="isInvitationOpen = true"
           >
             Invite member
             <span aria-hidden="true">↗</span>
-          </button>
+          </BaseButton>
         </div>
         <p v-if="success" class="message success" role="status">
           {{ success }}
@@ -198,7 +194,7 @@ async function submitCompany() {
         @submit.prevent="submitCompany"
       >
         <label for="company-name">Company name</label>
-        <input
+        <BaseInput
           id="company-name"
           ref="nameInput"
           v-model="name"
@@ -208,13 +204,18 @@ async function submitCompany() {
           placeholder="e.g. Orbital Labs"
           :readonly="isSaving"
           :aria-describedby="error ? 'company-error' : undefined"
-        >
+        />
         <p v-if="error" id="company-error" class="message error" role="alert">
           {{ error }}
         </p>
-        <button class="button primary" type="submit" :disabled="isSaving">
+        <BaseButton
+          class="primary"
+          variant="primary"
+          type="submit"
+          :disabled="isSaving"
+        >
           {{ isSaving ? "Creating…" : "Create" }}
-        </button>
+        </BaseButton>
       </form>
     </dialog>
     <InviteUserDialog

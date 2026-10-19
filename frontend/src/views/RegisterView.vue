@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { acceptInvitation, previewInvitation } from "../api/invitations.api.js";
+import BaseButton from "../components/BaseButton.vue";
+import BaseInput from "../components/BaseInput.vue";
 import { useAuthStore } from "../stores/auth.js";
 
 const auth = useAuthStore();
@@ -129,9 +131,14 @@ async function submit() {
           You are signed in as {{ auth.user.email }}. Sign out to create the
           invited account.
         </p>
-        <button class="button primary" type="button" @click="auth.logout">
+        <BaseButton
+          class="primary"
+          variant="primary"
+          type="button"
+          @click="auth.logout"
+        >
           Sign out to register
-        </button>
+        </BaseButton>
       </template>
       <template v-else>
         <p v-if="isLoading" role="status">Checking your invitation…</p>
@@ -143,25 +150,26 @@ async function submit() {
         >
           {{ error }}
         </p>
-        <button
+        <BaseButton
           v-if="canRetry"
-          class="button secondary"
+          class="secondary"
+          variant="secondary"
           type="button"
           @click="loadInvitation"
         >
           Retry
-        </button>
+        </BaseButton>
         <form v-if="invitation" @submit.prevent="submit" :aria-busy="isSaving">
           <label for="registration-email">Email address</label>
-          <input
+          <BaseInput
             id="registration-email"
-            :value="invitation.email"
+            :model-value="invitation.email"
             type="email"
             autocomplete="username"
             readonly
-          >
+          />
           <label for="registration-password">Password</label>
-          <input
+          <BaseInput
             id="registration-password"
             v-model="password"
             type="password"
@@ -169,12 +177,12 @@ async function submit() {
             required
             :readonly="isSaving || isUnusable"
             :aria-describedby="error ? 'password-help registration-error' : 'password-help'"
-          >
+          />
           <p id="password-help" class="muted password-help">
             Use 15–128 characters.
           </p>
           <label for="registration-confirmation">Confirm password</label>
-          <input
+          <BaseInput
             id="registration-confirmation"
             v-model="confirmation"
             type="password"
@@ -182,15 +190,16 @@ async function submit() {
             required
             :readonly="isSaving || isUnusable"
             :aria-describedby="error ? 'registration-error' : undefined"
-          >
-          <button
-            class="button primary"
+          />
+          <BaseButton
+            class="primary"
+            variant="primary"
             type="submit"
             :disabled="isSaving || isUnusable"
           >
             {{ isSaving ? "Creating account…" : "Create account"
             }}<span aria-hidden="true">→</span>
-          </button>
+          </BaseButton>
         </form>
       </template>
       <RouterLink class="sign-in-link" :to="{ name: 'login' }"

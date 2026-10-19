@@ -1,5 +1,6 @@
 <script setup>
 import { useRoute, useRouter } from "vue-router";
+import BaseButton from "./components/BaseButton.vue";
 import { useAuthStore } from "./stores/auth.js";
 
 const auth = useAuthStore();
@@ -30,14 +31,16 @@ function signOut() {
         <span class="brand-symbol" aria-hidden="true">✧</span>
         Telemetry<span>Hub</span>
       </RouterLink>
-      <button
+      <BaseButton
         v-if="auth.isAuthenticated"
-        class="button secondary compact"
+        class="secondary compact"
+        variant="secondary"
         type="button"
         @click="signOut"
+        compact
       >
         Sign out <span aria-hidden="true">↗</span>
-      </button>
+      </BaseButton>
       <span v-else class="header-label">YOUR WORLD. CONNECTED.</span>
     </header>
     <RouterView />

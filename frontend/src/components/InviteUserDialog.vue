@@ -11,6 +11,8 @@ import { useRouter } from "vue-router";
 import { searchCompanies } from "../api/companies.api.js";
 import { inviteMember, inviteOwner } from "../api/invitations.api.js";
 import { useAuthStore } from "../stores/auth.js";
+import BaseButton from "./BaseButton.vue";
+import BaseInput from "./BaseInput.vue";
 
 const props = defineProps({
   recipient: {
@@ -224,9 +226,14 @@ async function submit() {
         spellcheck="false"
       />
       <div class="copy-actions">
-        <button class="button secondary" type="button" @click="copyLink">
+        <BaseButton
+          class="secondary"
+          variant="secondary"
+          type="button"
+          @click="copyLink"
+        >
           Copy link
-        </button>
+        </BaseButton>
         <div class="copy-feedback">
           <span class="copy-placeholder" aria-hidden="true">{{
             copySuccessMessage
@@ -247,7 +254,7 @@ async function submit() {
       <label for="invitation-email">{{
         isOwnerInvitation ? "Owner email address" : "Member email address"
       }}</label>
-      <input
+      <BaseInput
         id="invitation-email"
         ref="emailInput"
         v-model="email"
@@ -258,7 +265,7 @@ async function submit() {
         :placeholder="`${recipient}@company.com`"
         :readonly="isSaving"
         :aria-describedby="error ? 'invitation-error' : undefined"
-      >
+      />
       <span
         v-if="isOwnerInvitation"
         id="company-picker-label"
@@ -284,7 +291,7 @@ async function submit() {
           <label class="field-label" for="company-search"
             >Search companies</label
           >
-          <input
+          <BaseInput
             id="company-search"
             ref="searchInput"
             v-model="query"
@@ -293,19 +300,20 @@ async function submit() {
             autocomplete="off"
             placeholder="Type a company name"
             @keydown.enter.prevent
-          >
+          />
           <p v-if="isLoading" class="muted" role="status">
             Searching companies…
           </p>
           <div v-else-if="searchError">
             <p class="message error" role="alert">{{ searchError }}</p>
-            <button
+            <BaseButton
               type="button"
-              class="button secondary"
+              class="secondary"
+              variant="secondary"
               @click="loadCompanies(0)"
             >
               Retry search
-            </button>
+            </BaseButton>
           </div>
           <template v-else>
             <p v-if="!companies.length" class="muted" role="status">
@@ -329,22 +337,24 @@ async function submit() {
               </li>
             </ul>
             <div class="pagination">
-              <button
+              <BaseButton
                 v-if="offset > 0"
                 type="button"
-                class="button secondary"
+                class="secondary"
+                variant="secondary"
                 @click="loadCompanies(offset - 20)"
               >
                 Previous
-              </button>
-              <button
+              </BaseButton>
+              <BaseButton
                 v-if="hasMore && offset < 10000"
                 type="button"
-                class="button secondary"
+                class="secondary"
+                variant="secondary"
                 @click="loadCompanies(offset + 20)"
               >
                 Next
-              </button>
+              </BaseButton>
               <p v-if="hasMore && offset >= 10000" class="muted">
                 Narrow your search to find more companies.
               </p>
@@ -355,9 +365,14 @@ async function submit() {
       <p v-if="error" id="invitation-error" class="message error" role="alert">
         {{ error }}
       </p>
-      <button class="button primary" type="submit" :disabled="isSaving">
+      <BaseButton
+        class="primary"
+        variant="primary"
+        type="submit"
+        :disabled="isSaving"
+      >
         {{ isSaving ? "Creating invitation…" : `Invite ${recipient}` }}
-      </button>
+      </BaseButton>
     </form>
   </dialog>
 </template>
