@@ -20,7 +20,9 @@ export async function searchCompanies(query, offset, token, signal) {
     data.items.some(
       (item) =>
         typeof item?.id !== "string" ||
-        !/^[0-9a-f-]{36}$/i.test(item.id) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          item.id,
+        ) ||
         typeof item.name !== "string" ||
         !item.name,
     )
