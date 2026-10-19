@@ -364,6 +364,59 @@ test("invitation requires selection and preserves input on conflict", async ({
   );
 });
 
+test("company search resumes after an invitation interrupts it and fails", async ({
+  page,
+}) => {
+  await signIn(page);
+  const company = (name) => ({
+    id: "28f63fb6-b64f-4607-bb79-a6e815ab9131",
+    name,
+  });
+  let searchCount = 0;
+  await page.route("**/api/companies?*", async (route) => {
+    const query = new URL(route.request().url()).searchParams.get("q");
+    if (query === "Lunar") {
+      searchCount += 1;
+      // Leave the first search pending until the invitation cancels it.
+      if (searchCount === 1) return;
+    }
+    await route.fulfill({
+      json: {
+        items: [company(query === "Lunar" ? "Lunar Labs" : "Orbital Labs")],
+        has_more: false,
+      },
+    });
+  });
+  await page.route("**/owner-invitations", (route) =>
+    route.fulfill({ status: 409, json: {} }),
+  );
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Owner email address").fill("owner@example.com");
+  await dialog.locator("summary").click();
+  await dialog.getByRole("button", { name: "Orbital Labs" }).click();
+  await dialog.locator("summary").click();
+  await dialog.getByLabel("Search companies").fill("Lunar");
+  await expect.poll(() => searchCount).toBe(1);
+  await expect(dialog.getByRole("status")).toContainText("Searching companies");
+  // Close only the dropdown so the pending search cannot cover the submit button.
+  await page.keyboard.press("Escape");
+  await dialog
+    .getByRole("button", { name: "Invite owner", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText("pending invitation");
+  await dialog.locator("summary").click();
+  await expect(dialog.getByLabel("Search companies")).toHaveValue("Lunar");
+  await expect(
+    dialog.getByRole("button", { name: "Lunar Labs" }),
+  ).toBeVisible();
+  await expect(dialog.locator("summary")).toContainText("Orbital Labs");
+  await expect(dialog.getByLabel("Owner email address")).toHaveValue(
+    "owner@example.com",
+  );
+  expect(searchCount).toBe(2);
+});
+
 test("company search pages results and ignores obsolete responses", async ({
   page,
 }, testInfo) => {
