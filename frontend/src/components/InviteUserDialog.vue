@@ -112,16 +112,16 @@ async function submit() {
 <template>
   <dialog
     ref="dialog"
-    class="panel owner-dialog"
+    class="panel invitation-dialog"
     aria-labelledby="invitation-title"
     @cancel.prevent="close"
   >
-    <div class="dialog-heading">
-      <h2 id="invitation-title">
+    <div class="invitation-dialog__heading">
+      <h2 id="invitation-title" class="invitation-dialog__title">
         {{ isOwnerInvitation ? "Invite company owner" : "Invite member" }}
       </h2>
       <button
-        class="close-button"
+        class="invitation-dialog__close"
         type="button"
         :aria-label="`Close invite ${recipient}`"
         :disabled="isSaving"
@@ -136,49 +136,57 @@ async function submit() {
       tabindex="-1"
       aria-label="Invitation created"
     >
-      <p class="message success" role="status">
+      <p class="message message--success" role="status">
         Invitation created for {{ invitation.email
         }}<template v-if="isOwnerInvitation"> at {{ selected.name }}</template>.
       </p>
-      <p class="muted">
+      <p class="supporting-text">
         No email was sent. Share this invitation link with the {{ recipient }}.
         It is only available here until you close this popup.
       </p>
-      <label for="invitation-link">Invitation link</label>
+      <label class="invitation-result__label" for="invitation-link"
+        >Invitation link</label
+      >
       <textarea
         id="invitation-link"
+        class="invitation-result__link"
         :value="invitationLink"
         readonly
         rows="3"
         spellcheck="false"
       />
-      <div class="copy-actions">
-        <BaseButton
-          class="secondary"
-          variant="secondary"
-          type="button"
-          @click="copyLink"
-        >
+      <div class="invitation-result__actions">
+        <BaseButton variant="secondary" type="button" @click="copyLink">
           Copy link
         </BaseButton>
-        <div class="copy-feedback">
-          <span class="copy-placeholder" aria-hidden="true">{{
+        <div class="invitation-result__feedback">
+          <span class="invitation-result__placeholder" aria-hidden="true">{{
             copySuccessMessage
           }}</span>
-          <span class="copy-placeholder" aria-hidden="true">{{
+          <span class="invitation-result__placeholder" aria-hidden="true">{{
             copyFailureMessage
           }}</span>
-          <p role="status" aria-live="polite" aria-atomic="true">
+          <p
+            class="invitation-result__copy-message"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {{ copyMessage }}
           </p>
         </div>
       </div>
-      <p class="muted">
+      <p class="supporting-text">
         Expires {{ new Date(invitation.expiresAt).toLocaleString() }}.
       </p>
     </section>
-    <form v-else @submit.prevent="submit" :aria-busy="isSaving">
-      <label for="invitation-email">{{
+    <form
+      v-else
+      class="invitation-form"
+      @submit.prevent="submit"
+      :aria-busy="isSaving"
+    >
+      <label class="invitation-form__label" for="invitation-email">{{
         isOwnerInvitation ? "Owner email address" : "Member email address"
       }}</label>
       <BaseInput
@@ -201,11 +209,16 @@ async function submit() {
         @update:model-value="clearError"
         @unauthorized="handlePickerUnauthorized"
       />
-      <p v-if="error" id="invitation-error" class="message error" role="alert">
+      <p
+        v-if="error"
+        id="invitation-error"
+        class="message message--error"
+        role="alert"
+      >
         {{ error }}
       </p>
       <BaseButton
-        class="primary"
+        class="invitation-form__submit"
         variant="primary"
         type="submit"
         :disabled="isSaving"
@@ -217,20 +230,109 @@ async function submit() {
 </template>
 
 <style scoped lang="scss">
-.owner-dialog { width: min(480px, calc(100% - 2rem)); max-height: calc(100svh - 2rem); padding: 1.75rem; color: var(--text); overflow: visible; }
-.owner-dialog::backdrop { background: #030810b8; backdrop-filter: blur(5px); }
-.dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
-h2 { font-size: 1.4rem; font-weight: 500; margin: 0; }
-.close-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: .5rem; background: transparent; color: var(--muted); font-size: 1.5rem; }
-form { display: grid; gap: .75rem; }
-form > .primary { margin-top: .75rem; }
-textarea { display: block; width: 100%; margin: .5rem 0 1rem; background: #09121e; color: var(--text); border: 1px solid var(--line); border-radius: .5rem; padding: .75rem; resize: vertical; font: inherit; }
-.invitation-result { overflow-wrap: anywhere; }
-.copy-actions { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: .75rem; }
-.copy-feedback { display: grid; min-width: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
-.copy-feedback > * { grid-area: 1 / 1; margin: 0; align-self: center; }
-// Reserve the space required by either outcome, even before the first copy attempt.
-.copy-placeholder { visibility: hidden; }
+.invitation-dialog {
+  width: min(480px, calc(100% - 2rem));
+  max-height: calc(100svh - 2rem);
+  padding: 1.75rem;
+  color: var(--text);
+  overflow: visible;
+}
+
+.invitation-dialog::backdrop {
+  background: #030810b8;
+  backdrop-filter: blur(5px);
+}
+
+.invitation-dialog__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.invitation-dialog__title {
+  font-size: 1.4rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.invitation-dialog__close {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+}
+
+.invitation-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.invitation-form__label,
+.invitation-result__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.invitation-form__submit {
+  margin-top: 0.75rem;
+}
+
+.invitation-result {
+  overflow-wrap: anywhere;
+}
+
 // This section receives focus to announce the result; controls retain their focus rings.
-.invitation-result:focus { outline: none; }
+.invitation-result:focus {
+  outline: none;
+}
+
+.invitation-result__link {
+  display: block;
+  width: 100%;
+  margin: 0.5rem 0 1rem;
+  background: #09121e;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  resize: vertical;
+  font: inherit;
+}
+
+.invitation-result__actions {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.invitation-result__feedback {
+  display: grid;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.invitation-result__placeholder,
+.invitation-result__copy-message {
+  grid-area: 1 / 1;
+  margin: 0;
+  align-self: center;
+}
+
+// Reserve the space required by either outcome, even before the first copy attempt.
+.invitation-result__placeholder {
+  visibility: hidden;
+}
 </style>

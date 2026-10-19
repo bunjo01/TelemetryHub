@@ -1,3 +1,8 @@
+@use "./styles/message";
+@use "./styles/panel";
+@use "./styles/eyebrow";
+@use "./styles/supporting-text";
+
 :root {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   color: #e5edf3;
@@ -12,20 +17,46 @@
   text-rendering: optimizeLegibility;
   color-scheme: dark;
 }
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: radial-gradient(ellipse at 15% 45%, #16314055, transparent 55%), radial-gradient(ellipse at 95% 20%, #1c243a55, transparent 45%); }
-button { font: inherit; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: .55; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-h1:focus { outline: none; }
-.panel { background: linear-gradient(135deg, #142131eb, #0e1825f5); border: 1px solid var(--line); border-radius: 1rem; box-shadow: 0 24px 70px #0002; }
-.eyebrow { font-size: .65rem; letter-spacing: .17em; color: var(--accent); font-weight: 600; }
-.muted { color: var(--muted); font-size: .9rem; }
-label { font-size: .8rem; font-weight: 500; }
-.message { font-size: .85rem; padding: .85rem 1rem; border-radius: .4rem; overflow-wrap: anywhere; }
-.error { background: #46212d; color: #ffc5cb; border: 1px solid #d8798c44; }
-.success { background: #153d35; color: #b2f0d9; border: 1px solid #75c6a344; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 
-body:has(dialog:modal) { overflow: hidden; }
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(ellipse at 15% 45%, #16314055, transparent 55%),
+    radial-gradient(ellipse at 95% 20%, #1c243a55, transparent 45%);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+h1:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}
+
+body:has(dialog:modal) {
+  overflow: hidden;
+}

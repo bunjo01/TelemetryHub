@@ -1,0 +1,18 @@
+.message {
+  font-size: 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.message--error {
+  background: #46212d;
+  color: #ffc5cb;
+  border: 1px solid #d8798c44;
+}
+
+.message--success {
+  background: #153d35;
+  color: #b2f0d9;
+  border: 1px solid #75c6a344;
+}

@@ -541,7 +541,9 @@ test("copy feedback stays beside the button without resizing the modal", async (
         fails,
       );
       await button.click();
-      const feedback = dialog.locator(".copy-feedback [role=status]");
+      const feedback = dialog.locator(
+        ".invitation-result__feedback [role=status]",
+      );
       await expect(feedback).toContainText(
         fails ? "Select the link" : "Invitation link copied.",
       );

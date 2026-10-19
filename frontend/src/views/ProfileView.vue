@@ -76,44 +76,49 @@ async function submitCompany() {
 
 <template>
   <main v-if="auth.user" id="main" class="profile-layout">
-    <div class="page-heading">
+    <div class="profile-layout__heading">
       <p class="eyebrow">YOUR PERSONAL ORBIT</p>
-      <h1 tabindex="-1">Welcome to your space.</h1>
-      <p class="muted">
+      <h1 class="profile-layout__title" tabindex="-1">
+        Welcome to your space.
+      </h1>
+      <p class="supporting-text">
         Your profile and the tools to bring your team together.
       </p>
     </div>
-    <div class="profile-grid">
-      <section class="panel identity" aria-labelledby="profile-title">
-        <div class="avatar" aria-hidden="true">
-          {{ auth.user.email.charAt(0).toUpperCase() }}<span>✧</span>
+    <div class="profile-layout__grid">
+      <section class="panel profile-card" aria-labelledby="profile-title">
+        <div class="profile-card__avatar" aria-hidden="true">
+          {{ auth.user.email.charAt(0).toUpperCase()
+          }}<span class="profile-card__avatar-mark">✧</span>
         </div>
         <p class="eyebrow">CONNECTED TO TELEMETRYHUB</p>
-        <h2 id="profile-title">Your profile</h2>
-        <dl>
-          <div>
-            <dt>Email address</dt>
-            <dd>{{ auth.user.email }}</dd>
+        <h2 id="profile-title" class="profile-card__title">Your profile</h2>
+        <dl class="profile-card__details">
+          <div class="profile-card__detail">
+            <dt class="profile-card__label">Email address</dt>
+            <dd class="profile-card__value">{{ auth.user.email }}</dd>
           </div>
-          <div>
-            <dt>Role</dt>
-            <dd>
-              <span class="role-badge">{{ roleLabels[auth.user.role] }}</span>
+          <div class="profile-card__detail">
+            <dt class="profile-card__label">Role</dt>
+            <dd class="profile-card__value">
+              <span class="profile-card__role">{{
+                roleLabels[auth.user.role]
+              }}</span>
             </dd>
           </div>
         </dl>
       </section>
       <section class="panel workspace" aria-labelledby="workspace-title">
-        <div class="workspace-heading">
-          <span class="section-icon" aria-hidden="true">⌘</span
+        <div class="workspace__heading">
+          <span class="workspace__icon" aria-hidden="true">⌘</span
           ><span class="eyebrow">MISSION CONTROL</span>
         </div>
-        <h2 id="workspace-title">
+        <h2 id="workspace-title" class="workspace__title">
           {{
             isAdmin || isOwner ? "Build your connected world." : "You're part of the crew."
           }}
         </h2>
-        <p class="muted workspace-description">
+        <p class="supporting-text workspace__description">
           {{
             isAdmin
               ? "Create a home for a new team. Company owners will help take it from there."
@@ -122,12 +127,11 @@ async function submitCompany() {
                 : "Your account is ready. Device monitoring and more will arrive here as your workspace grows."
           }}
         </p>
-        <div v-if="isAdmin || isOwner" class="actions">
+        <div v-if="isAdmin || isOwner" class="workspace__actions">
           <BaseButton
             v-if="isAdmin"
-            type="button"
-            class="primary"
             variant="primary"
+            type="button"
             :disabled="isSaving"
             aria-haspopup="dialog"
             aria-controls="company-dialog"
@@ -138,7 +142,6 @@ async function submitCompany() {
           </BaseButton>
           <BaseButton
             v-if="isAdmin"
-            class="secondary"
             variant="secondary"
             type="button"
             aria-haspopup="dialog"
@@ -148,7 +151,6 @@ async function submitCompany() {
           </BaseButton>
           <BaseButton
             v-else
-            class="secondary"
             variant="secondary"
             type="button"
             aria-haspopup="dialog"
@@ -158,13 +160,13 @@ async function submitCompany() {
             <span aria-hidden="true">↗</span>
           </BaseButton>
         </div>
-        <p v-if="success" class="message success" role="status">
+        <p v-if="success" class="message message--success" role="status">
           {{ success }}
         </p>
-        <div class="workspace-art" aria-hidden="true">
-          <div class="ring ring-one"></div>
-          <div class="ring ring-two"></div>
-          <span>✧</span><i></i>
+        <div class="workspace__art" aria-hidden="true">
+          <div class="workspace__ring"></div>
+          <div class="workspace__ring workspace__ring--crossed"></div>
+          <span class="workspace__star">✧</span><i class="workspace__node"></i>
         </div>
       </section>
     </div>
@@ -176,11 +178,13 @@ async function submitCompany() {
       aria-labelledby="company-dialog-title"
       @cancel.prevent="closeCompanyDialog"
     >
-      <div class="dialog-heading">
-        <h2 id="company-dialog-title">Create company</h2>
+      <div class="company-dialog__heading">
+        <h2 id="company-dialog-title" class="company-dialog__title">
+          Create company
+        </h2>
         <button
           type="button"
-          class="close-button"
+          class="company-dialog__close"
           aria-label="Close create company"
           :disabled="isSaving"
           @click="closeCompanyDialog"
@@ -193,7 +197,9 @@ async function submitCompany() {
         :aria-busy="isSaving"
         @submit.prevent="submitCompany"
       >
-        <label for="company-name">Company name</label>
+        <label class="company-form__label" for="company-name"
+          >Company name</label
+        >
         <BaseInput
           id="company-name"
           ref="nameInput"
@@ -205,11 +211,16 @@ async function submitCompany() {
           :readonly="isSaving"
           :aria-describedby="error ? 'company-error' : undefined"
         />
-        <p v-if="error" id="company-error" class="message error" role="alert">
+        <p
+          v-if="error"
+          id="company-error"
+          class="message message--error company-form__message"
+          role="alert"
+        >
           {{ error }}
         </p>
         <BaseButton
-          class="primary"
+          class="company-form__submit"
           variant="primary"
           type="submit"
           :disabled="isSaving"
@@ -227,41 +238,289 @@ async function submitCompany() {
 </template>
 
 <style scoped lang="scss">
-.profile-layout { width: min(1100px, 90%); margin: 0 auto; padding: clamp(1.5rem, 4svh, 4rem) 0; }
-.page-heading { margin-bottom: 2.8rem; }
-h1 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 450; letter-spacing: -.045em; margin: .8rem 0; }
-h2 { font-size: 1.5rem; font-weight: 500; letter-spacing: -.025em; }
-.profile-grid { display: grid; grid-template-columns: .85fr 1.4fr; gap: 1.5rem; }
-.identity, .workspace { padding: 2.25rem; }
-.avatar { height: 5rem; width: 5rem; display: grid; place-items: center; position: relative; color: var(--accent); font-size: 2rem; border-radius: 50%; border: 1px solid #8ae7d644; background: radial-gradient(at top left, #355e61, #12212c); margin-bottom: 2rem; }
-.avatar span { position: absolute; bottom: -.2rem; right: -.2rem; background: #10232c; border: 1px solid var(--line); width: 1.7rem; height: 1.7rem; border-radius: 50%; font-size: 1rem; text-align: center; }
-dl { margin: 2rem 0 0; } dl > div { padding: 1.3rem 0; border-top: 1px solid var(--line); } dt { color: var(--muted); font-size: .8rem; margin-bottom: .6rem; } dd { margin: 0; overflow-wrap: anywhere; font-size: .95rem; }
-.role-badge { display: inline-block; border-radius: .35rem; background: #8ae7d60d; border: 1px solid #8ae7d629; padding: .3rem .6rem; color: var(--accent); font-size: .8rem; }
-.workspace { position: relative; overflow: hidden; min-height: 420px; }
-.workspace-heading { display: flex; align-items: center; gap: .7rem; }
-.section-icon { font-size: 1.4rem; color: var(--accent); }
-.workspace-description { max-width: 27rem; line-height: 1.8; }
-.actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
-.company-dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100svh - 2rem); padding: 1.75rem; color: var(--text); }
-.company-dialog::backdrop { background: #030810b8; backdrop-filter: blur(5px); }
-.dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
-.dialog-heading h2 { margin: 0; }
-.close-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: .5rem; background: transparent; color: var(--muted); font-size: 1.5rem; }
-.close-button:hover:not(:disabled) { color: var(--text); background: #223547; }
-.company-form { display: grid; gap: .75rem; }
-.company-form .primary { margin-top: .75rem; }
-.company-form .message { margin: 0; }
-.workspace-art { position: relative; height: 130px; opacity: .55; pointer-events: none; margin-top: 2rem; } .ring { position: absolute; border: 1px solid #72b5bb44; width: 320px; height: 140px; border-radius: 50%; right: -60px; top: 20px; transform: rotate(-25deg); } .ring-two { transform: rotate(25deg); border-style: dashed; } .workspace-art > span { position: absolute; right: 60px; top: 35px; font-size: 3rem; color: var(--accent); } .workspace-art i { position: absolute; right: 220px; top: 105px; border-radius: 50%; width: 6px; height: 6px; background: var(--accent); box-shadow: 0 0 20px var(--accent); }
-@media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; } .profile-layout { padding-top: 2.5rem; } .identity, .workspace { padding: 1.5rem; } }
+.profile-layout {
+  width: min(1100px, 90%);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4svh, 4rem) 0;
+}
+
+.profile-layout__heading {
+  margin-bottom: 2.8rem;
+}
+
+.profile-layout__title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 450;
+  letter-spacing: -0.045em;
+  margin: 0.8rem 0;
+}
+
+.profile-card__title,
+.workspace__title,
+.company-dialog__title {
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.profile-layout__grid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.4fr;
+  gap: 1.5rem;
+}
+
+.profile-card,
+.workspace {
+  padding: 2.25rem;
+}
+
+.profile-card__avatar {
+  height: 5rem;
+  width: 5rem;
+  display: grid;
+  place-items: center;
+  position: relative;
+  color: var(--accent);
+  font-size: 2rem;
+  border-radius: 50%;
+  border: 1px solid #8ae7d644;
+  background: radial-gradient(at top left, #355e61, #12212c);
+  margin-bottom: 2rem;
+}
+
+.profile-card__avatar-mark {
+  position: absolute;
+  bottom: -0.2rem;
+  right: -0.2rem;
+  background: #10232c;
+  border: 1px solid var(--line);
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.profile-card__details {
+  margin: 2rem 0 0;
+}
+
+.profile-card__detail {
+  padding: 1.3rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.profile-card__label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.profile-card__value {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+}
+
+.profile-card__role {
+  display: inline-block;
+  border-radius: 0.35rem;
+  background: #8ae7d60d;
+  border: 1px solid #8ae7d629;
+  padding: 0.3rem 0.6rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.workspace {
+  position: relative;
+  overflow: hidden;
+  min-height: 420px;
+}
+
+.workspace__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.workspace__icon {
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.workspace__description {
+  max-width: 27rem;
+  line-height: 1.8;
+}
+
+.workspace__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.workspace__art {
+  position: relative;
+  height: 130px;
+  opacity: 0.55;
+  pointer-events: none;
+  margin-top: 2rem;
+}
+
+.workspace__ring {
+  position: absolute;
+  border: 1px solid #72b5bb44;
+  width: 320px;
+  height: 140px;
+  border-radius: 50%;
+  right: -60px;
+  top: 20px;
+  transform: rotate(-25deg);
+}
+
+.workspace__ring--crossed {
+  transform: rotate(25deg);
+  border-style: dashed;
+}
+
+.workspace__star {
+  position: absolute;
+  right: 60px;
+  top: 35px;
+  font-size: 3rem;
+  color: var(--accent);
+}
+
+.workspace__node {
+  position: absolute;
+  right: 220px;
+  top: 105px;
+  border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  box-shadow: 0 0 20px var(--accent);
+}
+
+.company-dialog {
+  width: min(440px, calc(100% - 2rem));
+  max-height: calc(100svh - 2rem);
+  padding: 1.75rem;
+  color: var(--text);
+}
+
+.company-dialog::backdrop {
+  background: #030810b8;
+  backdrop-filter: blur(5px);
+}
+
+.company-dialog__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.company-dialog__title {
+  margin: 0;
+}
+
+.company-dialog__close {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+}
+
+.company-dialog__close:hover:not(:disabled) {
+  color: var(--text);
+  background: #223547;
+}
+
+.company-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.company-form__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.company-form__submit {
+  margin-top: 0.75rem;
+}
+
+.company-form__message {
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .profile-layout__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-layout {
+    padding-top: 2.5rem;
+  }
+
+  .profile-card,
+  .workspace {
+    padding: 1.5rem;
+  }
+}
+
 @media (min-width: 701px) and (max-height: 900px) {
-  .profile-layout { margin-block: auto; padding-block: 1.25rem; }
-  .page-heading { margin-bottom: 1.5rem; }
-  .page-heading h1 { font-size: 2.25rem; margin-block: .5rem; }
-  .identity, .workspace { padding: 1.5rem; }
-  .avatar { width: 4rem; height: 4rem; margin-bottom: 1rem; }
-  dl { margin-top: 1.25rem; }
-  dl > div { padding-block: 1rem; }
-  .workspace { min-height: 0; }
-  .workspace-art { height: 85px; margin-top: 1rem; }
+  .profile-layout {
+    margin-block: auto;
+    padding-block: 1.25rem;
+  }
+
+  .profile-layout__heading {
+    margin-bottom: 1.5rem;
+  }
+
+  .profile-layout__title {
+    font-size: 2.25rem;
+    margin-block: 0.5rem;
+  }
+
+  .profile-card,
+  .workspace {
+    padding: 1.5rem;
+  }
+
+  .profile-card__avatar {
+    width: 4rem;
+    height: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .profile-card__details {
+    margin-top: 1.25rem;
+  }
+
+  .profile-card__detail {
+    padding-block: 1rem;
+  }
+
+  .workspace {
+    min-height: 0;
+  }
+
+  .workspace__art {
+    height: 85px;
+    margin-top: 1rem;
+  }
 }
 </style>

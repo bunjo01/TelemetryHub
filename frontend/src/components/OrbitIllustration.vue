@@ -81,6 +81,11 @@
     </g>
   </svg>
 </template>
+
 <style scoped lang="scss">
-.orbit { width: 100%; max-width: 37.5rem; display: block; }
+.orbit {
+  width: 100%;
+  max-width: 37.5rem;
+  display: block;
+}
 </style>

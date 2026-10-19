@@ -218,10 +218,12 @@ defineExpose({ open });
           @keydown.enter.prevent
         />
 
-        <p v-if="isLoading" class="muted" role="status">Searching companies…</p>
+        <p v-if="isLoading" class="supporting-text" role="status">
+          Searching companies…
+        </p>
 
         <div v-else-if="searchError">
-          <p class="message error" role="alert">
+          <p class="message message--error" role="alert">
             {{ searchError }}
           </p>
           <BaseButton
@@ -234,7 +236,7 @@ defineExpose({ open });
         </div>
 
         <template v-else>
-          <p v-if="!companies.length" class="muted" role="status">
+          <p v-if="!companies.length" class="supporting-text" role="status">
             No companies found. Try a different name or create a company first.
           </p>
 
@@ -282,7 +284,10 @@ defineExpose({ open });
             >
               Next
             </BaseButton>
-            <p v-if="hasMore && offset >= maximumOffset" class="muted">
+            <p
+              v-if="hasMore && offset >= maximumOffset"
+              class="supporting-text"
+            >
               Narrow your search to find more companies.
             </p>
           </div>

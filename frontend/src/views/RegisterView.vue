@@ -124,19 +124,20 @@ async function submit() {
       aria-labelledby="registration-title"
     >
       <p class="eyebrow">YOUR INVITATION TO CONNECT</p>
-      <h1 id="registration-title" tabindex="-1">Join your space.</h1>
-      <p class="muted">Create your TelemetryHub account.</p>
+      <h1
+        id="registration-title"
+        class="registration-panel__title"
+        tabindex="-1"
+      >
+        Join your space.
+      </h1>
+      <p class="supporting-text">Create your TelemetryHub account.</p>
       <template v-if="auth.isAuthenticated">
         <p class="message">
           You are signed in as {{ auth.user.email }}. Sign out to create the
           invited account.
         </p>
-        <BaseButton
-          class="primary"
-          variant="primary"
-          type="button"
-          @click="auth.logout"
-        >
+        <BaseButton variant="primary" type="button" spread @click="auth.logout">
           Sign out to register
         </BaseButton>
       </template>
@@ -145,32 +146,42 @@ async function submit() {
         <p
           v-if="error"
           id="registration-error"
-          class="message error"
+          class="message message--error"
           role="alert"
         >
           {{ error }}
         </p>
         <BaseButton
           v-if="canRetry"
-          class="secondary"
           variant="secondary"
           type="button"
           @click="loadInvitation"
         >
           Retry
         </BaseButton>
-        <form v-if="invitation" @submit.prevent="submit" :aria-busy="isSaving">
-          <label for="registration-email">Email address</label>
+        <form
+          v-if="invitation"
+          class="registration-panel__form"
+          @submit.prevent="submit"
+          :aria-busy="isSaving"
+        >
+          <label class="registration-panel__label" for="registration-email"
+            >Email address</label
+          >
           <BaseInput
             id="registration-email"
+            class="registration-panel__input"
             :model-value="invitation.email"
             type="email"
             autocomplete="username"
             readonly
           />
-          <label for="registration-password">Password</label>
+          <label class="registration-panel__label" for="registration-password"
+            >Password</label
+          >
           <BaseInput
             id="registration-password"
+            class="registration-panel__input"
             v-model="password"
             type="password"
             autocomplete="new-password"
@@ -178,12 +189,20 @@ async function submit() {
             :readonly="isSaving || isUnusable"
             :aria-describedby="error ? 'password-help registration-error' : 'password-help'"
           />
-          <p id="password-help" class="muted password-help">
+          <p
+            id="password-help"
+            class="supporting-text registration-panel__password-help"
+          >
             Use 15–128 characters.
           </p>
-          <label for="registration-confirmation">Confirm password</label>
+          <label
+            class="registration-panel__label"
+            for="registration-confirmation"
+            >Confirm password</label
+          >
           <BaseInput
             id="registration-confirmation"
+            class="registration-panel__input"
             v-model="confirmation"
             type="password"
             autocomplete="new-password"
@@ -192,17 +211,19 @@ async function submit() {
             :aria-describedby="error ? 'registration-error' : undefined"
           />
           <BaseButton
-            class="primary"
             variant="primary"
             type="submit"
             :disabled="isSaving || isUnusable"
+            spread
           >
-            {{ isSaving ? "Creating account…" : "Create account"
-            }}<span aria-hidden="true">→</span>
+            {{ isSaving ? "Creating account…" : "Create account" }}
+            <span aria-hidden="true">→</span>
           </BaseButton>
         </form>
       </template>
-      <RouterLink class="sign-in-link" :to="{ name: 'login' }"
+      <RouterLink
+        class="registration-panel__sign-in-link"
+        :to="{ name: 'login' }"
         >Back to sign in</RouterLink
       >
     </section>
@@ -210,20 +231,72 @@ async function submit() {
 </template>
 
 <style scoped lang="scss">
-.registration-layout { width: min(480px, 90%); margin: auto; padding: 1.5rem 0; }
-.registration-panel { padding: 1.75rem 2rem; }
-h1 { font-size: 1.8rem; letter-spacing: -.04em; margin: .75rem 0; }
-form { display: grid; margin-top: 1.25rem; }
-input { margin: .4rem 0 1rem; }
-input[readonly] { opacity: .8; }
-.password-help { font-size: .8rem; margin: -.5rem 0 1rem; }
-.primary { justify-content: space-between; }
-.sign-in-link { display: inline-block; color: var(--accent); margin-top: 1.25rem; }
-@media (max-width: 480px) { .registration-panel { padding: 1.5rem; } }
+.registration-layout {
+  width: min(480px, 90%);
+  margin: auto;
+  padding: 1.5rem 0;
+}
+
+.registration-panel {
+  padding: 1.75rem 2rem;
+}
+
+.registration-panel__title {
+  font-size: 1.8rem;
+  letter-spacing: -0.04em;
+  margin: 0.75rem 0;
+}
+
+.registration-panel__form {
+  display: grid;
+  margin-top: 1.25rem;
+}
+
+.registration-panel__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.registration-panel__input {
+  margin: 0.4rem 0 1rem;
+}
+
+.registration-panel__input[readonly] {
+  opacity: 0.8;
+}
+
+.registration-panel__password-help {
+  --supporting-text-font-size: 0.8rem;
+  margin: -0.5rem 0 1rem;
+}
+
+.registration-panel__sign-in-link {
+  display: inline-block;
+  color: var(--accent);
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 480px) {
+  .registration-panel {
+    padding: 1.5rem;
+  }
+}
+
 @media (min-width: 681px) and (max-height: 740px) {
-  .registration-layout { padding-block: .75rem; }
-  .registration-panel { padding: 1rem 1.5rem; }
-  form { margin-top: .75rem; }
-  input { margin-bottom: .75rem; }
+  .registration-layout {
+    padding-block: 0.75rem;
+  }
+
+  .registration-panel {
+    padding: 1rem 1.5rem;
+  }
+
+  .registration-panel__form {
+    margin-top: 0.75rem;
+  }
+
+  .registration-panel__input {
+    margin-bottom: 0.75rem;
+  }
 }
 </style>
