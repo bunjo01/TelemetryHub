@@ -330,6 +330,104 @@ test("admin searches and selects a company before inviting its owner", async ({
   await expect(page.getByLabel("Invitation link")).toHaveCount(0);
 });
 
+for (const failure of ["server", "network", "malformed response"]) {
+  test(`company search recovers from ${failure} failure with retry`, async ({
+    page,
+  }) => {
+    await signIn(page);
+    const company = {
+      id: "28f63fb6-b64f-4607-bb79-a6e815ab9131",
+      name: "Orbital Labs",
+    };
+    let attempts = 0;
+    await page.route("**/api/companies?*", async (route) => {
+      const params = new URL(route.request().url()).searchParams;
+      if (params.get("q") === "Orbital") {
+        attempts += 1;
+        expect(params.get("offset")).toBe("0");
+        if (attempts === 1) {
+          if (failure === "network") return route.abort("failed");
+          if (failure === "server") {
+            return route.fulfill({
+              status: 503,
+              json: { detail: "private server details" },
+            });
+          }
+          return route.fulfill({
+            json: { items: [{ ...company, id: "invalid" }], has_more: false },
+          });
+        }
+      }
+      return route.fulfill({ json: { items: [company], has_more: false } });
+    });
+    await page
+      .getByRole("button", { name: "Invite owner", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Invite company owner" });
+    await dialog.getByLabel("Owner email address").fill("owner@example.com");
+    await dialog.locator("summary").click();
+    await dialog
+      .getByRole("button", { name: "Orbital Labs", exact: true })
+      .click();
+    await dialog.locator("summary").click();
+    await dialog.getByLabel("Search companies").fill("Orbital");
+    const message =
+      failure === "server"
+        ? "Service temporarily unavailable"
+        : failure === "network"
+          ? "Unable to reach the server"
+          : "The server returned an unexpected response";
+    await expect(dialog.getByRole("alert")).toContainText(message);
+    await expect(dialog.getByText("private server details")).toHaveCount(0);
+    await expect(dialog.getByText(/No companies found/)).toHaveCount(0);
+    await expect(dialog.getByText("Searching companies…")).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Orbital Labs", exact: true }),
+    ).toHaveCount(0);
+    await dialog
+      .getByRole("button", { name: "Retry search", exact: true })
+      .click();
+    await expect(
+      dialog.getByRole("button", { name: "Orbital Labs", exact: true }),
+    ).toBeVisible();
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Retry search" }),
+    ).toHaveCount(0);
+    await expect(dialog.getByLabel("Search companies")).toHaveValue("Orbital");
+    await expect(dialog.getByLabel("Owner email address")).toHaveValue(
+      "owner@example.com",
+    );
+    await expect(dialog.locator("summary")).toContainText("Orbital Labs");
+    expect(attempts).toBe(2);
+  });
+}
+
+test("company search expires the session and removes access to profile", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.route("**/api/companies?*", (route) =>
+    route.fulfill({ status: 401, json: {} }),
+  );
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  await expect(page).toHaveURL(/\/\?expired=1$/);
+  await expect(page.getByRole("alert")).toContainText(
+    "Your session has expired",
+  );
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  // Navigate through the SPA: a reload would clear the memory-only session anyway.
+  await page.evaluate(() => {
+    history.pushState({}, "", "/profile");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page).toHaveURL("/");
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+});
+
 test("invitation requires selection and preserves input on conflict", async ({
   page,
 }) => {
