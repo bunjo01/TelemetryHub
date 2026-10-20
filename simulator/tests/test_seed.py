@@ -1,4 +1,6 @@
-from simulator.seed import COMPANY_SPECS, generate_seed
+from pathlib import Path
+
+from simulator.seed import COMPANY_SPECS, generate_seed, load_seed, write_seed
 
 
 def all_devices(seed_data):
@@ -31,3 +33,13 @@ def test_all_ids_are_unique():
     ids += [loc.id for c in seed_data.companies for loc in c.locations]
     ids += [d.id for d in all_devices(seed_data)]
     assert len(ids) == len(set(ids))
+
+
+def test_seed_survives_write_and_load(tmp_path: Path) -> None:
+    original = generate_seed(42, COMPANY_SPECS)
+    path = tmp_path / "seed.json"
+
+    write_seed(original, path)
+    loaded = load_seed(path)
+
+    assert loaded == original

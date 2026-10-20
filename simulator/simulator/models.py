@@ -4,6 +4,7 @@ Owned by the simulator. Never imported from or by the backend.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -69,3 +70,16 @@ class Company:
 class SeedData:
     seed: int
     companies: tuple[Company, ...]
+
+
+@dataclass(frozen=True)
+class TelemetryEvent:
+    schema_version: int
+    event_id: UUID
+    device_id: UUID
+    event_time: datetime
+    temperature_c: float | None
+    humidity_pct: float | None
+    battery_pct: float | None
+    latitude: float | None
+    longitude: float | None

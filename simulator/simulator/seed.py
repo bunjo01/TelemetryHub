@@ -9,7 +9,7 @@ import json
 import random
 from dataclasses import asdict
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 from uuid import UUID
 
 from simulator.models import (
@@ -187,7 +187,50 @@ def generate_seed(seed: int, company_specs: list[CompanySpec]) -> SeedData:
 def write_seed(seed_data: SeedData, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # default=str turns UUID values into plain strings. StrEnum values are already strings.
-    path.write_text(json.dumps(asdict(seed_data), indent=2, default=str) + "\n")
+    path.write_text(json.dumps(asdict(seed_data), indent=2, default=str) + "\n", encoding="utf-8")
+
+
+def parse_configuration(data: dict[str, Any]) -> DeviceConfiguration:
+    return DeviceConfiguration(
+        sampling_interval_seconds=data["sampling_interval_seconds"],
+        enabled_sensors=tuple(SensorType(sensor) for sensor in data["enabled_sensors"]),
+        firmware_version=data["firmware_version"],
+    )
+
+
+def parse_device(data: dict[str, Any]) -> Device:
+    return Device(
+        id=UUID(data["id"]),
+        name=data["name"],
+        device_type=DeviceType(data["device_type"]),
+        status=DeviceStatus(data["status"]),
+        configuration=parse_configuration(data["configuration"]),
+    )
+
+
+def parse_location(data: dict[str, Any]) -> Location:
+    return Location(
+        id=UUID(data["id"]),
+        name=data["name"],
+        location_type=LocationType(data["location_type"]),
+        devices=tuple(parse_device(device) for device in data["devices"]),
+    )
+
+
+def parse_company(data: dict[str, Any]) -> Company:
+    return Company(
+        id=UUID(data["id"]),
+        name=data["name"],
+        locations=tuple(parse_location(location) for location in data["locations"]),
+    )
+
+
+def load_seed(path: Path) -> SeedData:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return SeedData(
+        seed=data["seed"],
+        companies=tuple(parse_company(company) for company in data["companies"]),
+    )
 
 
 def main() -> None:
