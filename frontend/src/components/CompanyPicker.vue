@@ -122,7 +122,6 @@ watch(
       return;
     }
 
-    // Resume only unfinished searches, including the debounce wait.
     interruptedOffset = isLoading.value ? requestedOffset : null;
     stopSearch();
 
@@ -367,7 +366,6 @@ defineExpose({ open });
   padding: 0 0.35rem 0 0;
   margin: 0.75rem 0;
   min-height: 0;
-  // Four complete rows at most; smaller screens can show fewer.
   max-height: calc(4 * var(--row-height) + 3 * var(--row-gap));
   overflow-y: auto;
   overscroll-behavior: contain;

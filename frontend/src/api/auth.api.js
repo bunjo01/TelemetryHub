@@ -40,7 +40,6 @@ export async function getProfile(token, signal) {
       ))
   )
     throw invalidResponse();
-  // Only retain the fields this interface needs; IDs and status are not displayed.
   return {
     email: data.email,
     role: data.role,

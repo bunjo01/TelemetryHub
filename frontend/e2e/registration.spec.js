@@ -153,7 +153,6 @@ test("signed-in visitor must explicitly sign out to register", async ({
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/profile$/);
-  // SPA navigation preserves the existing in-memory session.
   await page.evaluate((url) => {
     history.pushState({}, "", url);
     window.dispatchEvent(new PopStateEvent("popstate"));

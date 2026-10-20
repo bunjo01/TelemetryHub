@@ -290,7 +290,6 @@ async function submit() {
   overflow-wrap: anywhere;
 }
 
-// This section receives focus to announce the result; controls retain their focus rings.
 .invitation-result:focus {
   outline: none;
 }
@@ -331,7 +330,6 @@ async function submit() {
   align-self: center;
 }
 
-// Reserve the space required by either outcome, even before the first copy attempt.
 .invitation-result__placeholder {
   visibility: hidden;
 }

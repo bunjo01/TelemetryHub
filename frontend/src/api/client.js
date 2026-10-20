@@ -5,7 +5,6 @@ export class ApiError extends Error {
   }
 }
 
-// Same-origin /api is forwarded to FastAPI by Vite (or the production proxy).
 export async function request(path, { token, body, signal } = {}) {
   let response;
   try {

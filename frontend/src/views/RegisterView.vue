@@ -85,7 +85,6 @@ async function submit() {
     error.value = "Passwords do not match.";
     return;
   }
-  // Match Python's character count, including characters outside the BMP.
   const length = Array.from(password.value).length;
   if (length < 15 || length > 128) {
     error.value = "Use between 15 and 128 characters for your password.";

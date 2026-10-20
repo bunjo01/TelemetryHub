@@ -3,7 +3,6 @@ import { computed, ref } from "vue";
 import { getProfile, login } from "../api/auth.api.js";
 
 export const useAuthStore = defineStore("auth", () => {
-  // Memory only: reloading the page requires signing in again.
   const token = ref("");
   const user = ref(null);
   const isAuthenticated = computed(() => Boolean(token.value && user.value));

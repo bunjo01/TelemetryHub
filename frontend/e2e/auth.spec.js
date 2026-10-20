@@ -417,7 +417,6 @@ test("company search expires the session and removes access to profile", async (
   );
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-  // Navigate through the SPA: a reload would clear the memory-only session anyway.
   await page.evaluate(() => {
     history.pushState({}, "", "/profile");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -475,7 +474,6 @@ test("company search resumes after an invitation interrupts it and fails", async
     const query = new URL(route.request().url()).searchParams.get("q");
     if (query === "Lunar") {
       searchCount += 1;
-      // Leave the first search pending until the invitation cancels it.
       if (searchCount === 1) return;
     }
     await route.fulfill({
@@ -497,7 +495,6 @@ test("company search resumes after an invitation interrupts it and fails", async
   await dialog.getByLabel("Search companies").fill("Lunar");
   await expect.poll(() => searchCount).toBe(1);
   await expect(dialog.getByRole("status")).toContainText("Searching companies");
-  // Close only the dropdown so the pending search cannot cover the submit button.
   await page.keyboard.press("Escape");
   await dialog
     .getByRole("button", { name: "Invite owner", exact: true })
