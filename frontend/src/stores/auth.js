@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { getProfile, login } from "../api/auth.api.js";
+import { useNotificationStore } from "./notifications.js";
 
 export const useAuthStore = defineStore("auth", () => {
   const token = ref("");
@@ -9,6 +10,7 @@ export const useAuthStore = defineStore("auth", () => {
   let activeRequest;
 
   function logout() {
+    useNotificationStore().clear();
     activeRequest?.abort();
     activeRequest = undefined;
     token.value = "";

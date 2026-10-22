@@ -10,10 +10,12 @@ import {
 } from "vue";
 import { searchCompanies } from "../api/companies.api.js";
 import { useAuthStore } from "../stores/auth.js";
+import { useNotificationStore } from "../stores/notifications.js";
 import BaseButton from "./BaseButton.vue";
 import BaseInput from "./BaseInput.vue";
 
 const props = defineProps({
+  errorMessage: { type: String, default: "" },
   disabled: {
     type: Boolean,
     default: false,
@@ -28,9 +30,11 @@ const selected = defineModel({
 const emit = defineEmits(["unauthorized"]);
 
 const auth = useAuthStore();
+const notifications = useNotificationStore();
 const id = useId();
 const selectId = `${id}-company`;
 const searchId = `${id}-search`;
+const errorId = `${id}-error`;
 
 const dropdown = ref(null);
 const summary = ref(null);
@@ -94,6 +98,7 @@ async function loadCompanies(nextOffset) {
   searchRequest = controller;
   isLoading.value = true;
   searchError.value = "";
+  notifications.remove("company-search");
 
   try {
     const result = await searchCompanies(
@@ -118,6 +123,11 @@ async function loadCompanies(nextOffset) {
       emit("unauthorized", failure);
     } else {
       searchError.value = failure.message;
+      notifications.show({
+        key: "company-search",
+        variant: "error",
+        message: failure.message,
+      });
     }
   } finally {
     if (searchRequest === controller) {
@@ -133,6 +143,7 @@ watch(query, () => {
   companies.value = [];
   hasMore.value = false;
   searchError.value = "";
+  notifications.remove("company-search");
 
   if (props.disabled || isDisposed) return;
 
@@ -164,6 +175,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   isDisposed = true;
+  notifications.remove("company-search");
   stopSearch();
 });
 
@@ -243,6 +255,15 @@ defineExpose({ focus });
 
       <label class="company-picker__label" :for="selectId"> Company </label>
 
+      <p
+        v-if="errorMessage"
+        :id="errorId"
+        class="message message--error company-picker__message"
+        role="alert"
+      >
+        {{ errorMessage }}
+      </p>
+
       <select
         :id="selectId"
         size="4"
@@ -251,6 +272,8 @@ defineExpose({ focus });
         class="company-picker__select"
         :disabled="disabled"
         :aria-busy="isLoading"
+        :aria-invalid="errorMessage ? true : undefined"
+        :aria-describedby="errorMessage ? errorId : undefined"
       >
         <option
           class="company-picker__option company-picker__option--placeholder"
@@ -287,11 +310,8 @@ defineExpose({ focus });
       </p>
 
       <div v-else-if="searchError" class="company-picker__error">
-        <p
-          class="message message--error company-picker__message"
-          role="alert"
-        >
-          {{ searchError }}
+        <p class="supporting-text company-picker__message">
+          Company search is unavailable. Retry or change your search.
         </p>
 
         <BaseButton

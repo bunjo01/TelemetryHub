@@ -1,10 +1,11 @@
 <script setup>
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BaseButton from "../components/BaseButton.vue";
 import BaseInput from "../components/BaseInput.vue";
 import OrbitIllustration from "../components/OrbitIllustration.vue";
 import { useAuthStore } from "../stores/auth.js";
+import { useNotificationStore } from "../stores/notifications.js";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -12,8 +13,24 @@ const route = useRoute();
 const email = ref("");
 const password = ref("");
 const isLoading = ref(false);
-const error = ref(
-  route.query.expired ? "Your session has expired. Please sign in again." : "",
+const notifications = useNotificationStore();
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.query.expired)
+      notifications.show({
+        key: "login",
+        variant: "error",
+        message: "Your session has expired. Please sign in again.",
+      });
+    else if (route.query.registered === "1")
+      notifications.show({
+        key: "registration",
+        variant: "success",
+        message: "Account created. Sign in with your new password.",
+      });
+  },
+  { immediate: true, flush: "post" },
 );
 let isDisposed = false;
 onBeforeUnmount(() => {
@@ -23,15 +40,22 @@ onBeforeUnmount(() => {
 });
 async function submit() {
   if (isLoading.value) return;
+  const origin = document.activeElement;
   isLoading.value = true;
-  error.value = "";
+  notifications.remove("login");
   try {
     const signedIn = await auth.signIn(email.value, password.value);
     password.value = "";
     isLoading.value = false;
     if (signedIn && !isDisposed) await router.replace({ name: "profile" });
   } catch (failure) {
-    if (!isDisposed) error.value = failure.message;
+    if (!isDisposed)
+      notifications.show({
+        key: "login",
+        variant: "error",
+        message: failure.message,
+        origin,
+      });
   } finally {
     password.value = "";
     isLoading.value = false;
@@ -63,13 +87,6 @@ async function submit() {
         Sign in to your space.
       </h1>
       <p class="supporting-text">Enter your details to access TelemetryHub.</p>
-      <p
-        v-if="route.query.registered === '1'"
-        class="message message--success"
-        role="status"
-      >
-        Account created. Sign in with your new password.
-      </p>
       <form
         class="login-panel__form"
         @submit.prevent="submit"
@@ -86,7 +103,6 @@ async function submit() {
           required
           maxlength="254"
           :readonly="isLoading"
-          :aria-describedby="error ? 'login-error' : undefined"
         />
         <label class="login-panel__label" for="password">Password</label>
         <BaseInput
@@ -99,16 +115,7 @@ async function submit() {
           required
           maxlength="128"
           :readonly="isLoading"
-          :aria-describedby="error ? 'login-error' : undefined"
         />
-        <p
-          v-if="error"
-          id="login-error"
-          class="message message--error"
-          role="alert"
-        >
-          {{ error }}
-        </p>
         <BaseButton
           class="login-panel__submit"
           variant="primary"

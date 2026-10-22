@@ -132,6 +132,13 @@ test("company failure preserves input and closing returns keyboard focus", async
   await expect(
     page.getByRole("button", { name: "Create company" }),
   ).toBeFocused();
+  const dismiss = page.getByRole("button", {
+    name: "Dismiss error notification",
+  });
+  await dismiss.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
 });
 
 test("desktop and mobile pages fit their viewport", async ({
@@ -321,7 +328,7 @@ test("admin searches and selects a company before inviting its owner", async ({
   await dialog.getByRole("button", { name: "Copy link", exact: true }).click();
   await expect(
     dialog
-      .getByRole("status")
+      .getByRole("alert")
       .filter({ hasText: /Select the link and copy it manually/ }),
   ).toBeVisible();
   await page.evaluate(() =>
@@ -406,6 +413,14 @@ for (const failure of ["server", "network", "malformed response"]) {
     await expect(
       dialog.getByRole("listbox", { name: "Company", exact: true }),
     ).toHaveValue(company.id);
+    await dialog
+      .getByRole("button", { name: "Dismiss error notification" })
+      .click();
+    await expect(
+      dialog.getByText(
+        "Company search is unavailable. Retry or change your search.",
+      ),
+    ).toBeVisible();
     await dialog
       .getByRole("button", { name: "Retry search", exact: true })
       .click();
@@ -617,7 +632,7 @@ test("company search pages results and ignores obsolete responses", async ({
   await expect(dialog).not.toBeVisible();
 });
 
-test("copy feedback stays beside the button without resizing the modal", async ({
+test("copy toasts stay accessible without resizing or scrolling the modal", async ({
   page,
 }) => {
   await signIn(page);
@@ -649,6 +664,7 @@ test("copy feedback stays beside the button without resizing the modal", async (
     const dialog = page.getByRole("dialog");
     await dialog.locator("summary").click();
     await dialog.getByLabel("Owner email address").fill("owner@example.com");
+
     await dialog
       .getByRole("listbox", { name: "Company", exact: true })
       .selectOption({ label: "Orbital Labs" });
@@ -661,6 +677,9 @@ test("copy feedback stays beside the button without resizing the modal", async (
     });
     await expect(button).toBeVisible();
     const before = await dialog.boundingBox();
+    const scrollHeight = await dialog.evaluate(
+      (element) => element.scrollHeight,
+    );
     for (const fails of [false, true]) {
       await page.evaluate(
         (fails) =>
@@ -675,18 +694,28 @@ test("copy feedback stays beside the button without resizing the modal", async (
         fails,
       );
       await button.click();
-      const feedback = dialog.locator(
-        ".invitation-result__feedback [role=status]",
-      );
+      const feedback = dialog.getByRole(fails ? "alert" : "status").filter({
+        hasText: fails ? "Select the link" : "Invitation link copied.",
+      });
       await expect(feedback).toContainText(
         fails ? "Select the link" : "Invitation link copied.",
       );
       expect(await dialog.boundingBox()).toEqual(before);
-      const buttonBox = await button.boundingBox();
-      const feedbackBox = await feedback.boundingBox();
-      expect(feedbackBox.x).toBeGreaterThanOrEqual(
-        buttonBox.x + buttonBox.width,
+      expect(await dialog.evaluate((element) => element.scrollHeight)).toBe(
+        scrollHeight,
       );
+      await expect(feedback).toBeInViewport();
+      const dismiss = dialog
+        .getByRole("button", {
+          name: fails
+            ? "Dismiss error notification"
+            : "Dismiss success notification",
+        })
+        .last();
+      await dismiss.focus();
+      await page.keyboard.press("Enter");
+      await expect(feedback).toHaveCount(0);
+      await expect(button).toBeFocused();
       expect(before.x).toBeGreaterThanOrEqual(0);
       expect(before.x + before.width).toBeLessThanOrEqual(width);
       expect(

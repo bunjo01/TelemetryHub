@@ -7,8 +7,11 @@ import BaseButton from "../components/BaseButton.vue";
 import BaseInput from "../components/BaseInput.vue";
 import InviteUserDialog from "../components/InviteUserDialog.vue";
 import { useAuthStore } from "../stores/auth.js";
+import { useNotificationStore } from "../stores/notifications.js";
 
 const auth = useAuthStore();
+const notifications = useNotificationStore();
+let notificationTarget;
 const router = useRouter();
 const isAdmin = computed(() => auth.user?.role === "system_admin");
 const isOwner = computed(() => auth.user?.role === "company_owner");
@@ -21,25 +24,31 @@ const name = ref("");
 const nameInput = ref(null);
 const isSaving = ref(false);
 const error = ref("");
-const success = ref("");
 let pendingRequest;
-onBeforeUnmount(() => pendingRequest?.abort());
+onBeforeUnmount(() => {
+  pendingRequest?.abort();
+  notifications.unregisterTarget(notificationTarget);
+});
 
 function openCompanyDialog() {
   error.value = "";
-  success.value = "";
+  notifications.remove("company-create");
   name.value = "";
   companyDialog.value.showModal();
+  notificationTarget = companyDialog.value;
+  notifications.registerTarget(notificationTarget);
   nameInput.value?.focus();
 }
 function closeCompanyDialog() {
   if (isSaving.value) return;
+  notifications.unregisterTarget(notificationTarget);
   companyDialog.value.close();
 }
 async function submitCompany() {
   if (isSaving.value) return;
+  const origin = document.activeElement;
   error.value = "";
-  success.value = "";
+  notifications.remove("company-create");
   if (!name.value.trim()) {
     error.value = "Enter a company name.";
     nameInput.value?.focus();
@@ -55,7 +64,11 @@ async function submitCompany() {
       controller.signal,
     );
     if (controller.signal.aborted) return;
-    success.value = `${company.name} was created successfully.`;
+    notifications.show({
+      key: "company-create",
+      variant: "success",
+      message: `${company.name} was created successfully.`,
+    });
     name.value = "";
     isSaving.value = false;
     closeCompanyDialog();
@@ -65,7 +78,12 @@ async function submitCompany() {
       auth.logout();
       await router.replace({ name: "login", query: { expired: "1" } });
     } else {
-      error.value = failure.message;
+      notifications.show({
+        key: "company-create",
+        variant: "error",
+        message: failure.message,
+        origin,
+      });
     }
   } finally {
     isSaving.value = false;
@@ -160,9 +178,6 @@ async function submitCompany() {
             <span aria-hidden="true">↗</span>
           </BaseButton>
         </div>
-        <p v-if="success" class="message message--success" role="status">
-          {{ success }}
-        </p>
         <div class="workspace__art" aria-hidden="true">
           <div class="workspace__ring"></div>
           <div class="workspace__ring workspace__ring--crossed"></div>
@@ -209,6 +224,8 @@ async function submitCompany() {
           autocomplete="organization"
           placeholder="e.g. Orbital Labs"
           :readonly="isSaving"
+          :aria-invalid="error ? true : undefined"
+          @update:model-value="error = ''"
           :aria-describedby="error ? 'company-error' : undefined"
         />
         <p

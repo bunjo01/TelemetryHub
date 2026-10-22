@@ -5,14 +5,20 @@ import { acceptInvitation, previewInvitation } from "../api/invitations.api.js";
 import BaseButton from "../components/BaseButton.vue";
 import BaseInput from "../components/BaseInput.vue";
 import { useAuthStore } from "../stores/auth.js";
+import { useNotificationStore } from "../stores/notifications.js";
 
 const auth = useAuthStore();
+const notifications = useNotificationStore();
 const route = useRoute();
 const router = useRouter();
 const invitation = ref(null);
 const password = ref("");
 const confirmation = ref("");
 const error = ref("");
+const passwordError = ref("");
+const confirmationError = ref("");
+const passwordInput = ref(null);
+const confirmationInput = ref(null);
 const isLoading = ref(false);
 const isSaving = ref(false);
 const canRetry = ref(false);
@@ -36,6 +42,10 @@ async function loadInvitation() {
   invitation.value = null;
   clearPasswords();
   error.value = "";
+  passwordError.value = "";
+  confirmationError.value = "";
+  notifications.remove("registration-preview");
+  notifications.remove("registration-submit");
   canRetry.value = false;
   isUnusable.value = false;
   isSaving.value = false;
@@ -57,8 +67,15 @@ async function loadInvitation() {
     if (!controller.signal.aborted && !isDisposed) invitation.value = result;
   } catch (failure) {
     if (!controller.signal.aborted && !isDisposed) {
-      error.value = failure.message;
       canRetry.value = failure.status !== 400 && failure.status !== 422;
+      if (canRetry.value) {
+        notifications.show({
+          key: "registration-preview",
+          variant: "error",
+          message: failure.message,
+        });
+        error.value = "We could not check your invitation. Retry to continue.";
+      } else error.value = failure.message;
     }
   } finally {
     if (activeRequest === controller) isLoading.value = false;
@@ -80,14 +97,21 @@ async function submit() {
     auth.isAuthenticated
   )
     return;
+  const origin = document.activeElement;
   error.value = "";
-  if (password.value !== confirmation.value) {
-    error.value = "Passwords do not match.";
-    return;
-  }
+  passwordError.value = "";
+  confirmationError.value = "";
+  notifications.remove("registration-submit");
   const length = Array.from(password.value).length;
   if (length < 15 || length > 128) {
-    error.value = "Use between 15 and 128 characters for your password.";
+    passwordError.value =
+      "Use between 15 and 128 characters for your password.";
+    passwordInput.value?.focus();
+    return;
+  }
+  if (password.value !== confirmation.value) {
+    confirmationError.value = "Passwords do not match.";
+    confirmationInput.value?.focus();
     return;
   }
   const controller = new AbortController();
@@ -104,8 +128,15 @@ async function submit() {
     await router.replace({ name: "login", query: { registered: "1" } });
   } catch (failure) {
     if (!controller.signal.aborted && !isDisposed) {
-      error.value = failure.message;
       isUnusable.value = [400, 409].includes(failure.status);
+      if (isUnusable.value) error.value = failure.message;
+      else
+        notifications.show({
+          key: "registration-submit",
+          variant: "error",
+          message: failure.message,
+          origin,
+        });
     }
   } finally {
     if (activeRequest === controller) {
@@ -146,7 +177,7 @@ async function submit() {
           v-if="error"
           id="registration-error"
           class="message message--error"
-          role="alert"
+          :role="canRetry ? undefined : 'alert'"
         >
           {{ error }}
         </p>
@@ -180,14 +211,25 @@ async function submit() {
           >
           <BaseInput
             id="registration-password"
+            ref="passwordInput"
             class="registration-panel__input"
             v-model="password"
             type="password"
             autocomplete="new-password"
             required
             :readonly="isSaving || isUnusable"
-            :aria-describedby="error ? 'password-help registration-error' : 'password-help'"
+            :aria-invalid="passwordError ? true : undefined"
+            @update:model-value="passwordError = ''; confirmationError = ''"
+            :aria-describedby="passwordError ? 'password-help password-error' : 'password-help'"
           />
+          <p
+            v-if="passwordError"
+            id="password-error"
+            class="message message--error"
+            role="alert"
+          >
+            {{ passwordError }}
+          </p>
           <p
             id="password-help"
             class="supporting-text registration-panel__password-help"
@@ -201,14 +243,25 @@ async function submit() {
           >
           <BaseInput
             id="registration-confirmation"
+            ref="confirmationInput"
             class="registration-panel__input"
             v-model="confirmation"
             type="password"
             autocomplete="new-password"
             required
             :readonly="isSaving || isUnusable"
-            :aria-describedby="error ? 'registration-error' : undefined"
+            :aria-invalid="confirmationError ? true : undefined"
+            @update:model-value="confirmationError = ''"
+            :aria-describedby="confirmationError ? 'confirmation-error' : undefined"
           />
+          <p
+            v-if="confirmationError"
+            id="confirmation-error"
+            class="message message--error"
+            role="alert"
+          >
+            {{ confirmationError }}
+          </p>
           <BaseButton
             variant="primary"
             type="submit"

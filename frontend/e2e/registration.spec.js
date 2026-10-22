@@ -43,6 +43,16 @@ for (const role of ["company_owner", "member"]) {
     await expect(page.getByRole("alert")).toContainText(
       "Passwords do not match",
     );
+    await expect(page.getByLabel("Confirm password")).toBeFocused();
+    await expect(page.getByLabel("Confirm password")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    await expect(
+      page
+        .getByRole("region", { name: "Notifications", exact: true })
+        .getByRole("alert"),
+    ).toHaveCount(0);
     expect(writes).toBe(0);
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create account" }).click();

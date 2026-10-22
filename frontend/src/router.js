@@ -1,6 +1,7 @@
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "./stores/auth.js";
+import { useNotificationStore } from "./stores/notifications.js";
 import LoginView from "./views/LoginView.vue";
 import ProfileView from "./views/ProfileView.vue";
 import RegisterView from "./views/RegisterView.vue";
@@ -21,7 +22,9 @@ export function makeRouter(pinia, history = createWebHistory()) {
       return { name: "login" };
     if (to.name === "login" && auth.isAuthenticated) return { name: "profile" };
   });
-  router.afterEach(async (to) => {
+  router.afterEach(async (to, _from, failure) => {
+    if (failure) return;
+    useNotificationStore(pinia).clear();
     document.title = `${({ profile: "Your profile", register: "Create account", login: "Sign in" })[to.name] ?? "TelemetryHub"} · TelemetryHub`;
     await nextTick();
     document.querySelector("h1")?.focus();

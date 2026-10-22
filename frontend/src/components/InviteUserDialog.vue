@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { inviteMember, inviteOwner } from "../api/invitations.api.js";
 import { useAuthStore } from "../stores/auth.js";
+import { useNotificationStore } from "../stores/notifications.js";
 import BaseButton from "./BaseButton.vue";
 import BaseInput from "./BaseInput.vue";
 import CompanyPicker from "./CompanyPicker.vue";
@@ -17,6 +18,8 @@ const props = defineProps({
 const isOwnerInvitation = computed(() => props.recipient === "owner");
 const emit = defineEmits(["close"]);
 const auth = useAuthStore();
+const notifications = useNotificationStore();
+let notificationTarget;
 const router = useRouter();
 const dialog = ref(null);
 const emailInput = ref(null);
@@ -26,7 +29,6 @@ const selected = ref(null);
 const isSaving = ref(false);
 const error = ref("");
 const invitation = ref(null);
-const copyMessage = ref("");
 const copySuccessMessage = "Invitation link copied.";
 const copyFailureMessage =
   "Unable to copy automatically. Select the link and copy it manually.";
@@ -39,11 +41,22 @@ const invitationLink = computed(() => {
   return new URL(href, window.location.origin).href;
 });
 async function copyLink() {
+  notifications.remove("invitation-copy");
   try {
     await navigator.clipboard.writeText(invitationLink.value);
-    if (!isDisposed) copyMessage.value = copySuccessMessage;
+    if (!isDisposed)
+      notifications.show({
+        key: "invitation-copy",
+        variant: "success",
+        message: copySuccessMessage,
+      });
   } catch {
-    if (!isDisposed) copyMessage.value = copyFailureMessage;
+    if (!isDisposed)
+      notifications.show({
+        key: "invitation-copy",
+        variant: "error",
+        message: copyFailureMessage,
+      });
   }
 }
 let invitationRequest;
@@ -51,33 +64,47 @@ let isDisposed = false;
 
 onMounted(() => {
   dialog.value.showModal();
+  notificationTarget = dialog.value;
+  notifications.registerTarget(notificationTarget);
   emailInput.value.focus();
 });
 
 onBeforeUnmount(() => {
   isDisposed = true;
   invitationRequest?.abort();
+  notifications.unregisterTarget(notificationTarget);
+  notifications.remove("invitation-copy");
+  notifications.remove("invitation-submit");
 });
-async function handleFailure(failure, destination) {
+async function handleFailure(failure, origin) {
   if (failure.status === 401) {
     auth.logout();
     await router.replace({ name: "login", query: { expired: "1" } });
-  } else destination.value = failure.message;
+  } else
+    notifications.show({
+      key: "invitation-submit",
+      variant: "error",
+      message: failure.message,
+      origin,
+    });
 }
 function handlePickerUnauthorized(failure) {
-  return handleFailure(failure, error);
+  return handleFailure(failure);
 }
 function clearError() {
   error.value = "";
 }
 function close() {
   if (isSaving.value) return;
+  notifications.unregisterTarget(notificationTarget);
   dialog.value.close();
   emit("close");
 }
 async function submit() {
   if (isSaving.value) return;
+  const origin = document.activeElement;
   error.value = "";
+  notifications.remove("invitation-submit");
   if (isOwnerInvitation.value && !selected.value) {
     error.value = "Choose a company.";
     companyPicker.value.focus();
@@ -98,11 +125,16 @@ async function submit() {
     );
     if (controller.signal.aborted || isDisposed) return;
     invitation.value = result;
+    notifications.show({
+      key: "invitation-submit",
+      variant: "success",
+      message: "Invitation created.",
+    });
     await nextTick();
     dialog.value.querySelector(".invitation-result")?.focus();
   } catch (failure) {
     if (!controller.signal.aborted && !isDisposed)
-      await handleFailure(failure, error);
+      await handleFailure(failure, origin);
   } finally {
     isSaving.value = false;
   }
@@ -136,7 +168,7 @@ async function submit() {
       tabindex="-1"
       aria-label="Invitation created"
     >
-      <p class="message message--success" role="status">
+      <p class="invitation-result__summary">
         Invitation created for {{ invitation.email
         }}<template v-if="isOwnerInvitation"> at {{ selected.name }}</template>.
       </p>
@@ -159,22 +191,6 @@ async function submit() {
         <BaseButton variant="secondary" type="button" @click="copyLink">
           Copy link
         </BaseButton>
-        <div class="invitation-result__feedback">
-          <span class="invitation-result__placeholder" aria-hidden="true">{{
-            copySuccessMessage
-          }}</span>
-          <span class="invitation-result__placeholder" aria-hidden="true">{{
-            copyFailureMessage
-          }}</span>
-          <p
-            class="invitation-result__copy-message"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {{ copyMessage }}
-          </p>
-        </div>
       </div>
       <p class="supporting-text">
         Expires {{ new Date(invitation.expiresAt).toLocaleString() }}.
@@ -199,24 +215,16 @@ async function submit() {
         autocomplete="email"
         :placeholder="`${recipient}@company.com`"
         :readonly="isSaving"
-        :aria-describedby="error ? 'invitation-error' : undefined"
       />
       <CompanyPicker
         v-if="isOwnerInvitation"
         ref="companyPicker"
         v-model="selected"
         :disabled="isSaving"
+        :error-message="error"
         @update:model-value="clearError"
         @unauthorized="handlePickerUnauthorized"
       />
-      <p
-        v-if="error"
-        id="invitation-error"
-        class="message message--error"
-        role="alert"
-      >
-        {{ error }}
-      </p>
       <BaseButton
         class="invitation-form__submit"
         variant="primary"
@@ -308,29 +316,7 @@ async function submit() {
 }
 
 .invitation-result__actions {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
-}
-
-.invitation-result__feedback {
-  display: grid;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.invitation-result__placeholder,
-.invitation-result__copy-message {
-  grid-area: 1 / 1;
-  margin: 0;
-  align-self: center;
-}
-
-.invitation-result__placeholder {
-  visibility: hidden;
 }
 </style>

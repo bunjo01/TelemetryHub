@@ -1,6 +1,7 @@
 <script setup>
 import { useRoute, useRouter } from "vue-router";
 import BaseButton from "./components/BaseButton.vue";
+import ToastHost from "./components/ToastHost.vue";
 import { useAuthStore } from "./stores/auth.js";
 
 const auth = useAuthStore();
@@ -43,6 +44,7 @@ function signOut() {
       <span v-else class="site-header__tagline">YOUR WORLD. CONNECTED.</span>
     </header>
     <RouterView />
+    <ToastHost />
     <footer class="site-footer">
       <span>TelemetryHub</span><span>A little closer to everything.</span
       ><span class="site-footer__coordinate" aria-hidden="true"
