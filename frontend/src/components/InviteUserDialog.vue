@@ -79,8 +79,8 @@ async function submit() {
   if (isSaving.value) return;
   error.value = "";
   if (isOwnerInvitation.value && !selected.value) {
-    error.value = "Choose a company from the dropdown.";
-    companyPicker.value.open();
+    error.value = "Choose a company.";
+    companyPicker.value.focus();
     return;
   }
   isSaving.value = true;
@@ -235,7 +235,7 @@ async function submit() {
   max-height: calc(100svh - 2rem);
   padding: 1.75rem;
   color: var(--text);
-  overflow: visible;
+  overflow-y: auto;
 }
 
 .invitation-dialog::backdrop {

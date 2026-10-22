@@ -269,15 +269,35 @@ test("admin searches and selects a company before inviting its owner", async ({
   await page.getByRole("button", { name: "Invite owner", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Invite company owner" });
   await expect(dialog.getByLabel("Owner email address")).toBeFocused();
-  await dialog.getByLabel("Owner email address").fill("owner@example.com");
+  await expect(dialog.getByLabel("Search companies")).not.toBeVisible();
   await dialog.locator("summary").click();
+  await expect(dialog.getByLabel("Search companies")).toBeFocused();
+  await expect(dialog.locator("summary")).not.toBeVisible();
+  await expect(dialog.locator("optgroup")).toHaveCount(0);
+  await dialog.getByLabel("Search companies").click();
+  await dialog.getByLabel("Owner email address").fill("owner@example.com");
+
   await dialog.getByLabel("Search companies").fill("missing");
   await expect(dialog.getByText(/No companies found/)).toBeVisible();
   await dialog.getByLabel("Search companies").fill("Orbital");
   await dialog
-    .getByRole("button", { name: "Orbital Labs", exact: true })
-    .click();
+    .getByRole("listbox", { name: "Company", exact: true })
+    .selectOption({ label: "Orbital Labs" });
+  await expect(
+    dialog.getByRole("listbox", { name: "Company", exact: true }),
+  ).toHaveValue("28f63fb6-b64f-4607-bb79-a6e815ab9131");
+  await expect(
+    dialog.getByRole("listbox", { name: "Company", exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(dialog.getByLabel("Search companies")).not.toBeVisible();
+  await expect(dialog.locator("summary")).toBeFocused();
   await expect(dialog.locator("summary")).toContainText("Orbital Labs");
+  await dialog.locator("summary").click();
+  await expect(dialog.getByLabel("Search companies")).toHaveValue("Orbital");
+  await dialog.getByRole("listbox", { name: "Company", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByLabel("Search companies")).not.toBeVisible();
   await expect(dialog.getByText(companyId)).toHaveCount(0);
   await dialog
     .getByRole("button", { name: "Invite owner", exact: true })
@@ -364,12 +384,13 @@ for (const failure of ["server", "network", "malformed response"]) {
       .getByRole("button", { name: "Invite owner", exact: true })
       .click();
     const dialog = page.getByRole("dialog", { name: "Invite company owner" });
+    await dialog.locator("summary").click();
     await dialog.getByLabel("Owner email address").fill("owner@example.com");
-    await dialog.locator("summary").click();
+
     await dialog
-      .getByRole("button", { name: "Orbital Labs", exact: true })
-      .click();
-    await dialog.locator("summary").click();
+      .getByRole("listbox", { name: "Company", exact: true })
+      .selectOption({ label: "Orbital Labs" });
+
     await dialog.getByLabel("Search companies").fill("Orbital");
     const message =
       failure === "server"
@@ -381,15 +402,16 @@ for (const failure of ["server", "network", "malformed response"]) {
     await expect(dialog.getByText("private server details")).toHaveCount(0);
     await expect(dialog.getByText(/No companies found/)).toHaveCount(0);
     await expect(dialog.getByText("Searching companies…")).toHaveCount(0);
+    await expect(dialog.locator("option:enabled")).toHaveCount(1);
     await expect(
-      dialog.getByRole("button", { name: "Orbital Labs", exact: true }),
-    ).toHaveCount(0);
+      dialog.getByRole("listbox", { name: "Company", exact: true }),
+    ).toHaveValue(company.id);
     await dialog
       .getByRole("button", { name: "Retry search", exact: true })
       .click();
     await expect(
-      dialog.getByRole("button", { name: "Orbital Labs", exact: true }),
-    ).toBeVisible();
+      dialog.getByRole("option", { name: "Orbital Labs", exact: true }),
+    ).toHaveCount(1);
     await expect(dialog.getByRole("alert")).toHaveCount(0);
     await expect(
       dialog.getByRole("button", { name: "Retry search" }),
@@ -398,7 +420,9 @@ for (const failure of ["server", "network", "malformed response"]) {
     await expect(dialog.getByLabel("Owner email address")).toHaveValue(
       "owner@example.com",
     );
-    await expect(dialog.locator("summary")).toContainText("Orbital Labs");
+    await expect(
+      dialog.getByRole("listbox", { name: "Company", exact: true }),
+    ).toHaveValue("28f63fb6-b64f-4607-bb79-a6e815ab9131");
     expect(attempts).toBe(2);
   });
 }
@@ -451,7 +475,10 @@ test("invitation requires selection and preserves input on conflict", async ({
     .getByRole("button", { name: "Invite owner", exact: true })
     .click();
   await expect(dialog.getByRole("alert")).toContainText("Choose a company");
-  await dialog.getByRole("button", { name: "Orbital Labs" }).click();
+  await expect(dialog.getByLabel("Search companies")).toBeFocused();
+  await dialog
+    .getByRole("listbox", { name: "Company", exact: true })
+    .selectOption({ label: "Orbital Labs" });
   await dialog
     .getByRole("button", { name: "Invite owner", exact: true })
     .click();
@@ -466,7 +493,10 @@ test("company search resumes after an invitation interrupts it and fails", async
 }) => {
   await signIn(page);
   const company = (name) => ({
-    id: "28f63fb6-b64f-4607-bb79-a6e815ab9131",
+    id:
+      name === "Lunar Labs"
+        ? "28f63fb6-b64f-4607-bb79-a6e815ab9132"
+        : "28f63fb6-b64f-4607-bb79-a6e815ab9131",
     name,
   });
   let searchCount = 0;
@@ -488,24 +518,28 @@ test("company search resumes after an invitation interrupts it and fails", async
   );
   await page.getByRole("button", { name: "Invite owner", exact: true }).click();
   const dialog = page.getByRole("dialog");
+  await dialog.locator("summary").click();
   await dialog.getByLabel("Owner email address").fill("owner@example.com");
-  await dialog.locator("summary").click();
-  await dialog.getByRole("button", { name: "Orbital Labs" }).click();
-  await dialog.locator("summary").click();
+
+  await dialog
+    .getByRole("listbox", { name: "Company", exact: true })
+    .selectOption({ label: "Orbital Labs" });
+
   await dialog.getByLabel("Search companies").fill("Lunar");
   await expect.poll(() => searchCount).toBe(1);
   await expect(dialog.getByRole("status")).toContainText("Searching companies");
-  await page.keyboard.press("Escape");
   await dialog
     .getByRole("button", { name: "Invite owner", exact: true })
     .click();
   await expect(dialog.getByRole("alert")).toContainText("pending invitation");
-  await dialog.locator("summary").click();
+
   await expect(dialog.getByLabel("Search companies")).toHaveValue("Lunar");
   await expect(
-    dialog.getByRole("button", { name: "Lunar Labs" }),
-  ).toBeVisible();
-  await expect(dialog.locator("summary")).toContainText("Orbital Labs");
+    dialog.getByRole("option", { name: "Lunar Labs", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    dialog.getByRole("listbox", { name: "Company", exact: true }),
+  ).toHaveValue("28f63fb6-b64f-4607-bb79-a6e815ab9131");
   await expect(dialog.getByLabel("Owner email address")).toHaveValue(
     "owner@example.com",
   );
@@ -554,28 +588,31 @@ test("company search pages results and ignores obsolete responses", async ({
   await page.getByRole("button", { name: "Invite owner", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.locator("summary").click();
+
   await dialog.getByRole("button", { name: "Next", exact: true }).click();
   await expect(
-    dialog.getByRole("button", { name: "Second company" }),
-  ).toBeVisible();
+    dialog.getByRole("option", { name: "Second company", exact: true }),
+  ).toHaveCount(1);
   await dialog.getByLabel("Search companies").fill("old");
   await started;
   await dialog.getByLabel("Search companies").fill("Orbital");
   await expect(
-    dialog.getByRole("button", { name: "Orbital Labs" }),
-  ).toBeVisible();
+    dialog.getByRole("option", { name: "Orbital Labs", exact: true }),
+  ).toHaveCount(1);
   finishOldSearch();
   await expect(
-    dialog.getByRole("button", { name: "Obsolete company" }),
+    dialog.getByRole("option", { name: "Obsolete company", exact: true }),
   ).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: testInfo.outputPath("invite-owner-mobile.png"),
     fullPage: true,
   });
+  await dialog.getByLabel("Search companies").focus();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel("Search companies")).not.toBeVisible();
+  await expect(dialog.locator("summary")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
 });
@@ -610,9 +647,11 @@ test("copy feedback stays beside the button without resizing the modal", async (
       .getByRole("button", { name: "Invite owner", exact: true })
       .click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Owner email address").fill("owner@example.com");
     await dialog.locator("summary").click();
-    await dialog.getByRole("button", { name: "Orbital Labs" }).click();
+    await dialog.getByLabel("Owner email address").fill("owner@example.com");
+    await dialog
+      .getByRole("listbox", { name: "Company", exact: true })
+      .selectOption({ label: "Orbital Labs" });
     await dialog
       .getByRole("button", { name: "Invite owner", exact: true })
       .click();
@@ -776,4 +815,94 @@ test("member invitation errors preserve input and expired sessions return to log
     .click();
   await expect(page).toHaveURL(/\?expired=1$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("company selection survives pagination, page retry and empty searches", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await signIn(page);
+  const first = {
+    id: "28f63fb6-b64f-4607-bb79-a6e815ab9131",
+    name: "Orbital Labs",
+  };
+  const second = {
+    id: "28f63fb6-b64f-4607-bb79-a6e815ab9132",
+    name: "Lunar Labs",
+  };
+  let nextPageAttempts = 0;
+  await page.route("**/api/companies?*", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("q") === "missing") {
+      expect(params.get("offset")).toBe("0");
+      return route.fulfill({ json: { items: [], has_more: false } });
+    }
+    if (params.get("offset") === "20") {
+      nextPageAttempts += 1;
+      if (nextPageAttempts === 1) {
+        return route.fulfill({ status: 503, json: {} });
+      }
+      return route.fulfill({ json: { items: [second], has_more: false } });
+    }
+    expect(params.get("offset")).toBe("0");
+    return route.fulfill({ json: { items: [first], has_more: true } });
+  });
+  await page.getByRole("button", { name: "Invite owner", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Invite company owner" });
+  await dialog.locator("summary").click();
+  const select = dialog.getByRole("listbox", { name: "Company", exact: true });
+  await expect(select).toHaveValue("");
+  await select.selectOption(first.id);
+  await dialog.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Service temporarily unavailable",
+  );
+  await expect(select).toHaveValue(first.id);
+  await expect(dialog.locator("option:enabled")).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Retry search" }).click();
+  await expect(
+    dialog.getByRole("option", { name: second.name, exact: true }),
+  ).toHaveCount(1);
+  expect(nextPageAttempts).toBe(2);
+  await expect(select).toHaveValue(first.id);
+  await expect(select.locator("option:checked")).toContainText(first.name);
+  await select.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(select).toHaveValue(second.id);
+  await expect(select).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await expect(select).not.toBeVisible();
+  await expect(dialog.locator("summary")).toBeFocused();
+  await dialog.locator("summary").click();
+  await expect(select).toHaveValue(second.id);
+  await dialog.getByRole("button", { name: "Previous", exact: true }).click();
+  await expect(
+    dialog.getByRole("option", { name: first.name, exact: true }),
+  ).toHaveCount(1);
+  await expect(select).toHaveValue(second.id);
+  await dialog.getByLabel("Search companies").fill("missing");
+  await expect(dialog.getByText(/No companies found/)).toBeVisible();
+  await expect(select).toHaveValue(second.id);
+  await expect(
+    dialog.getByRole("option", { name: second.name, exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    dialog.getByRole("button", { name: "Previous", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Next", exact: true }),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 320, height: 480 });
+  const submit = dialog.getByRole("button", {
+    name: "Invite owner",
+    exact: true,
+  });
+  await submit.scrollIntoViewIfNeeded();
+  await expect(submit).toBeInViewport();
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  expect(errors).toEqual([]);
 });
