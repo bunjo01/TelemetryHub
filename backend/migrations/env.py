@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, pool
 from app.config import MigrationSettings
 from app.infrastructure.models.base import Base
 from app.infrastructure.models.company import Company  # noqa: F401
+from app.infrastructure.models.device import Device  # noqa: F401
 from app.infrastructure.models.invitation import Invitation  # noqa: F401
 from app.infrastructure.models.user import User  # noqa: F401
 

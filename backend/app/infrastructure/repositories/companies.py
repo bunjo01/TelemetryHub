@@ -52,3 +52,15 @@ def search_companies(
     if query:
         statement = statement.where(Company.name.icontains(query, autoescape=True))
     return [CompanyOption(row.id, row.name) for row in session.execute(statement)]
+
+
+def read_company_status_for_device_operation(
+    session: Session,
+    company_id: UUID,
+) -> str | None:
+    statement = (
+        select(Company.status)
+        .where(Company.id == company_id)
+        .with_for_update(read=True)
+    )
+    return session.scalar(statement)
