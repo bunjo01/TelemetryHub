@@ -935,3 +935,91 @@ test("company selection survives pagination, page retry and empty searches", asy
   );
   expect(errors).toEqual([]);
 });
+
+for (const width of [1280, 390]) {
+  test(`company pagination stays stable while loading at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await signIn(page);
+    const first = {
+      id: "28f63fb6-b64f-4607-bb79-a6e815ab9131",
+      name: "Orbital Labs",
+    };
+    const second = {
+      id: "28f63fb6-b64f-4607-bb79-a6e815ab9132",
+      name: "Lunar Labs",
+    };
+    let requests = 0;
+    let release;
+    await page.route("**/api/companies?*", async (route) => {
+      requests += 1;
+      const offset = new URL(route.request().url()).searchParams.get("offset");
+      if (requests > 1) {
+        await new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      await route.fulfill({
+        json: {
+          items: [offset === "0" ? first : second],
+          has_more: offset === "0",
+        },
+      });
+    });
+    await page
+      .getByRole("button", { name: "Invite owner", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Invite company owner" });
+    await dialog.locator("summary").click();
+    const select = dialog.getByRole("listbox", {
+      name: "Company",
+      exact: true,
+    });
+    const previous = dialog.getByRole("button", {
+      name: "Previous",
+      exact: true,
+    });
+    const next = dialog.getByRole("button", { name: "Next", exact: true });
+    await expect(next).toBeEnabled();
+    await expect(previous).toBeDisabled();
+    await select.selectOption(first.id);
+    const bounds = await dialog.boundingBox();
+    const previousBounds = await previous.boundingBox();
+    const nextBounds = await next.boundingBox();
+    expect(nextBounds.x).toBeGreaterThan(previousBounds.x);
+
+    for (const [button, oldName, newName, count] of [
+      [next, first.name, second.name, 2],
+      [previous, second.name, first.name, 3],
+    ]) {
+      await button.click();
+      await expect.poll(() => requests).toBe(count);
+      await expect(select).toBeDisabled();
+      await expect(previous).toBeDisabled();
+      await expect(next).toBeDisabled();
+      await expect(dialog.getByLabel("Search companies")).toBeEnabled();
+      await expect(
+        select.getByRole("option", { name: oldName, exact: true }),
+      ).toHaveCount(1);
+      await expect(dialog.getByRole("status")).toContainText(
+        "Searching companies",
+      );
+      expect(await dialog.boundingBox()).toEqual(bounds);
+      expect(await previous.boundingBox()).toEqual(previousBounds);
+      expect(await next.boundingBox()).toEqual(nextBounds);
+      await button.dispatchEvent("click");
+      expect(requests).toBe(count);
+      release();
+      await expect(select).toBeEnabled();
+      await expect(
+        select.getByRole("option", { name: newName, exact: true }),
+      ).toHaveCount(1);
+      await expect(select).toHaveValue(first.id);
+      expect(await dialog.boundingBox()).toEqual(bounds);
+      expect(await previous.boundingBox()).toEqual(previousBounds);
+      expect(await next.boundingBox()).toEqual(nextBounds);
+      await expect(button).toBeDisabled();
+    }
+  });
+}

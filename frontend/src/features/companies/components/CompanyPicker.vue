@@ -1,16 +1,7 @@
 <script setup>
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  useId,
-  watch,
-} from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { searchCompanies } from "../../../api/companies.api.js";
-import BaseButton from "../../../components/ui/BaseButton.vue";
-import BaseInput from "../../../components/ui/BaseInput.vue";
+import SearchSelect from "../../../components/ui/SearchSelect.vue";
 import { useAuthStore } from "../../../stores/auth.js";
 import { useNotificationStore } from "../../../stores/notifications.js";
 
@@ -31,14 +22,7 @@ const emit = defineEmits(["unauthorized"]);
 
 const auth = useAuthStore();
 const notifications = useNotificationStore();
-const id = useId();
-const selectId = `${id}-company`;
-const searchId = `${id}-search`;
-const errorId = `${id}-error`;
-
-const dropdown = ref(null);
-const summary = ref(null);
-const searchInput = ref(null);
+const searchSelect = ref(null);
 const query = ref("");
 const companies = ref([]);
 const offset = ref(0);
@@ -46,26 +30,32 @@ const hasMore = ref(false);
 const isLoading = ref(false);
 const searchError = ref("");
 
-const visibleCompanies = computed(() =>
-  isLoading.value || searchError.value ? [] : companies.value,
+const options = computed(() =>
+  companies.value.map((company) => ({
+    value: company.id,
+    label: company.name,
+  })),
 );
 
-const isSelectionOutsideResults = computed(
-  () =>
-    selected.value !== null &&
-    !visibleCompanies.value.some((company) => company.id === selected.value.id),
-);
-
-const selectedCompanyId = computed({
+const selectedOption = computed({
   get() {
-    return selected.value?.id ?? "";
-  },
-  set(companyId) {
-    if (props.disabled || companyId === selected.value?.id) return;
+    if (!selected.value) return null;
 
-    const company = visibleCompanies.value.find(
-      (item) => item.id === companyId,
-    );
+    return {
+      value: selected.value.id,
+      label: selected.value.name,
+    };
+  },
+  set(option) {
+    if (
+      props.disabled ||
+      isLoading.value ||
+      !option ||
+      option.value === selected.value?.id
+    )
+      return;
+
+    const company = companies.value.find((item) => item.id === option.value);
 
     if (company) selected.value = company;
   },
@@ -117,7 +107,6 @@ async function loadCompanies(nextOffset) {
     if (controller.signal.aborted || isDisposed) return;
 
     companies.value = [];
-    hasMore.value = false;
 
     if (failure.status === 401) {
       emit("unauthorized", failure);
@@ -141,6 +130,7 @@ watch(query, () => {
   stopSearch();
 
   companies.value = [];
+  offset.value = 0;
   hasMore.value = false;
   searchError.value = "";
   notifications.remove("company-search");
@@ -179,37 +169,16 @@ onBeforeUnmount(() => {
   stopSearch();
 });
 
-async function focus() {
-  if (props.disabled) return;
-
-  dropdown.value.open = true;
-  await nextTick();
-
-  if (!props.disabled && dropdown.value?.open) searchInput.value?.focus();
+function focus() {
+  return searchSelect.value?.focus();
 }
 
-function onToggle() {
-  if (
-    dropdown.value?.open &&
-    (document.activeElement === summary.value ||
-      document.activeElement === document.body)
-  )
-    focus();
-}
-
-function closePicker() {
-  if (props.disabled) return;
-
-  dropdown.value.open = false;
-  summary.value?.focus();
-}
-
-function onEscape(event) {
-  if (!dropdown.value?.open) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-  closePicker();
+function changePage(direction) {
+  if (props.disabled || isLoading.value || searchError.value) return;
+  if (direction === "previous" && offset.value > 0)
+    loadCompanies(offset.value - pageSize);
+  if (direction === "next" && hasMore.value && offset.value < maximumOffset)
+    loadCompanies(offset.value + pageSize);
 }
 
 function retrySearch() {
@@ -220,277 +189,27 @@ defineExpose({ focus });
 </script>
 
 <template>
-  <details
-    ref="dropdown"
-    class="company-picker"
-    @toggle="onToggle"
-    @keydown.esc="onEscape"
-  >
-    <summary
-      ref="summary"
-      class="company-picker__summary"
-      :aria-disabled="disabled"
-      :inert="disabled"
-    >
-      Company: {{ selected?.name ?? "Select a company" }}
-    </summary>
-
-    <div class="company-picker__panel" :inert="disabled">
-      <label class="company-picker__label" :for="searchId">
-        Search companies
-      </label>
-
-      <BaseInput
-        :id="searchId"
-        ref="searchInput"
-        v-model="query"
-        class="company-picker__search"
-        type="search"
-        maxlength="200"
-        autocomplete="off"
-        placeholder="Type a company name"
-        :disabled="disabled"
-        @keydown.enter.prevent
-      />
-
-      <label class="company-picker__label" :for="selectId"> Company </label>
-
-      <p
-        v-if="errorMessage"
-        :id="errorId"
-        class="message message--error company-picker__message"
-        role="alert"
-      >
-        {{ errorMessage }}
-      </p>
-
-      <select
-        :id="selectId"
-        size="4"
-        @keydown.enter.prevent="closePicker"
-        v-model="selectedCompanyId"
-        class="company-picker__select"
-        :disabled="disabled"
-        :aria-busy="isLoading"
-        :aria-invalid="errorMessage ? true : undefined"
-        :aria-describedby="errorMessage ? errorId : undefined"
-      >
-        <option
-          class="company-picker__option company-picker__option--placeholder"
-          disabled
-          value=""
-        >
-          Select a company
-        </option>
-
-        <option
-          v-if="isSelectionOutsideResults"
-          class="company-picker__option"
-          :value="selected.id"
-        >
-          {{ selected.name }}
-        </option>
-
-        <option
-          v-for="company in visibleCompanies"
-          :key="company.id"
-          class="company-picker__option"
-          :value="company.id"
-        >
-          {{ company.name }}
-        </option>
-      </select>
-
-      <p
-        v-if="isLoading"
-        class="supporting-text company-picker__message"
-        role="status"
-      >
-        Searching companies…
-      </p>
-
-      <div v-else-if="searchError" class="company-picker__error">
-        <p class="supporting-text company-picker__message">
-          Company search is unavailable. Retry or change your search.
-        </p>
-
-        <BaseButton
-          type="button"
-          variant="secondary"
-          :disabled="disabled"
-          @click="retrySearch"
-        >
-          Retry search
-        </BaseButton>
-      </div>
-
-      <template v-else>
-        <p
-          v-if="!companies.length"
-          class="supporting-text company-picker__message"
-          role="status"
-        >
-          No companies found. Try a different name or create a company first.
-        </p>
-
-        <div v-if="offset > 0 || hasMore" class="company-picker__pagination">
-          <BaseButton
-            v-if="offset > 0"
-            type="button"
-            variant="secondary"
-            :disabled="disabled"
-            @click="loadCompanies(offset - pageSize)"
-          >
-            Previous
-          </BaseButton>
-
-          <BaseButton
-            v-if="hasMore && offset < maximumOffset"
-            type="button"
-            variant="secondary"
-            :disabled="disabled"
-            @click="loadCompanies(offset + pageSize)"
-          >
-            Next
-          </BaseButton>
-
-          <p
-            v-if="hasMore && offset >= maximumOffset"
-            class="supporting-text company-picker__message"
-          >
-            Narrow your search to find more companies.
-          </p>
-        </div>
-      </template>
-
-      <BaseButton
-        type="button"
-        variant="secondary"
-        :disabled="disabled"
-        @click="closePicker"
-      >
-        Done
-      </BaseButton>
-    </div>
-  </details>
+  <SearchSelect
+    ref="searchSelect"
+    v-model="selectedOption"
+    v-model:query="query"
+    :options="options"
+    label="Company"
+    search-label="Search companies"
+    placeholder="Select a company"
+    search-placeholder="Type a company name"
+    :search-max-length="200"
+    loading-text="Searching companies…"
+    empty-text="No companies found. Try a different name or create a company first."
+    :disabled="disabled"
+    :is-loading="isLoading"
+    :error-message="errorMessage"
+    :search-error="searchError ? 'Company search is unavailable. Retry or change your search.' : ''"
+    :has-previous="offset > 0"
+    :has-next="hasMore && offset < maximumOffset"
+    :pagination-message="hasMore && offset >= maximumOffset ? 'Narrow your search to find more companies.' : ''"
+    @previous="changePage('previous')"
+    @next="changePage('next')"
+    @retry="retrySearch"
+  />
 </template>
-
-<style scoped lang="scss">
-.company-picker {
-  min-width: 0;
-}
-
-.company-picker__summary {
-  padding: 0.8rem 1rem;
-  border: 1px solid #8aa5c02b;
-  border-radius: 0.5rem;
-  background: #09121e;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-
-.company-picker[open] .company-picker__summary {
-  display: none;
-}
-
-.company-picker__panel {
-  display: grid;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
-.company-picker__label {
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.company-picker__search,
-.company-picker__select {
-  width: 100%;
-  min-width: 0;
-}
-
-.company-picker__search:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.company-picker__select {
-  height: 12rem;
-  padding: 0.375rem;
-  font: inherit;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #507d82 #09121e;
-  border: 1px solid #8aa5c02b;
-  border-radius: 0.5rem;
-  background-color: #09121e;
-  color: var(--text);
-}
-
-.company-picker__select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-}
-
-.company-picker__select:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.company-picker__select::-webkit-scrollbar {
-  width: 6px;
-}
-
-.company-picker__select::-webkit-scrollbar-track {
-  background: #09121e;
-}
-
-.company-picker__select::-webkit-scrollbar-thumb {
-  border-radius: 1rem;
-  background: #507d82;
-}
-
-.company-picker__option {
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.35rem;
-  background-color: #09121e;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.company-picker__option:hover:not(:disabled) {
-  background-color: #1b3442;
-}
-
-.company-picker__option:checked:not(:disabled) {
-  background-color: #244d51;
-  color: var(--accent);
-}
-
-.company-picker__option--placeholder,
-.company-picker__option--placeholder:checked {
-  background-color: #09121e;
-  color: var(--muted);
-  cursor: default;
-}
-
-.company-picker__message {
-  margin: 0;
-}
-
-.company-picker__error {
-  display: grid;
-  justify-items: start;
-  gap: 0.75rem;
-}
-
-.company-picker__pagination {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-</style>
