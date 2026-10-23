@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { acceptInvitation, previewInvitation } from "../api/invitations.api.js";
-import BaseButton from "../components/BaseButton.vue";
-import BaseInput from "../components/BaseInput.vue";
+import BaseButton from "../components/ui/BaseButton.vue";
+import BaseInput from "../components/ui/BaseInput.vue";
 import { useAuthStore } from "../stores/auth.js";
 import { useNotificationStore } from "../stores/notifications.js";
 

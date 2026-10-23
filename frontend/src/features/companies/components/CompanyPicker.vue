@@ -8,11 +8,11 @@ import {
   useId,
   watch,
 } from "vue";
-import { searchCompanies } from "../api/companies.api.js";
-import { useAuthStore } from "../stores/auth.js";
-import { useNotificationStore } from "../stores/notifications.js";
-import BaseButton from "./BaseButton.vue";
-import BaseInput from "./BaseInput.vue";
+import { searchCompanies } from "../../../api/companies.api.js";
+import BaseButton from "../../../components/ui/BaseButton.vue";
+import BaseInput from "../../../components/ui/BaseInput.vue";
+import { useAuthStore } from "../../../stores/auth.js";
+import { useNotificationStore } from "../../../stores/notifications.js";
 
 const props = defineProps({
   errorMessage: { type: String, default: "" },

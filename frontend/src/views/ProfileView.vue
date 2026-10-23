@@ -3,9 +3,9 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { roleLabels } from "../api/auth.api.js";
 import { createCompany } from "../api/companies.api.js";
-import BaseButton from "../components/BaseButton.vue";
-import BaseInput from "../components/BaseInput.vue";
-import InviteUserDialog from "../components/InviteUserDialog.vue";
+import BaseButton from "../components/ui/BaseButton.vue";
+import BaseInput from "../components/ui/BaseInput.vue";
+import InviteUserDialog from "../features/invitations/components/InviteUserDialog.vue";
 import { useAuthStore } from "../stores/auth.js";
 import { useNotificationStore } from "../stores/notifications.js";
 

@@ -1,9 +1,9 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import BaseButton from "../components/BaseButton.vue";
-import BaseInput from "../components/BaseInput.vue";
-import OrbitIllustration from "../components/OrbitIllustration.vue";
+import OrbitIllustration from "../components/illustrations/OrbitIllustration.vue";
+import BaseButton from "../components/ui/BaseButton.vue";
+import BaseInput from "../components/ui/BaseInput.vue";
 import { useAuthStore } from "../stores/auth.js";
 import { useNotificationStore } from "../stores/notifications.js";
 

@@ -1,7 +1,7 @@
 <script setup>
 import { useRoute, useRouter } from "vue-router";
-import BaseButton from "./components/BaseButton.vue";
-import ToastHost from "./components/ToastHost.vue";
+import ToastHost from "./components/notifications/ToastHost.vue";
+import BaseButton from "./components/ui/BaseButton.vue";
 import { useAuthStore } from "./stores/auth.js";
 
 const auth = useAuthStore();

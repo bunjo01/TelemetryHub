@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted } from "vue";
-import { useNotificationStore } from "../stores/notifications.js";
+import { useNotificationStore } from "../../stores/notifications.js";
 import ToastNotification from "./ToastNotification.vue";
 
 const notifications = useNotificationStore();

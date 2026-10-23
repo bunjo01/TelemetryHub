@@ -1,12 +1,12 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { inviteMember, inviteOwner } from "../api/invitations.api.js";
-import { useAuthStore } from "../stores/auth.js";
-import { useNotificationStore } from "../stores/notifications.js";
-import BaseButton from "./BaseButton.vue";
-import BaseInput from "./BaseInput.vue";
-import CompanyPicker from "./CompanyPicker.vue";
+import { inviteMember, inviteOwner } from "../../../api/invitations.api.js";
+import BaseButton from "../../../components/ui/BaseButton.vue";
+import BaseInput from "../../../components/ui/BaseInput.vue";
+import { useAuthStore } from "../../../stores/auth.js";
+import { useNotificationStore } from "../../../stores/notifications.js";
+import CompanyPicker from "../../companies/components/CompanyPicker.vue";
 
 const props = defineProps({
   recipient: {
