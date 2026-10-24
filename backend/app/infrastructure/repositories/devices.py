@@ -21,6 +21,14 @@ class DeviceDetails:
     updated_at: datetime
 
 
+@dataclass(frozen=True)
+class DevicePage:
+    items: list[DeviceDetails]
+    limit: int
+    offset: int
+    has_more: bool
+
+
 def insert_device(
     session: Session,
     *,
@@ -57,6 +65,38 @@ def read_device_details(
         return None
 
     return _to_device_details(device)
+
+
+def read_device_page(
+    session: Session,
+    *,
+    company_id: UUID,
+    device_status: str | None,
+    search: str | None,
+    limit: int,
+    offset: int,
+) -> DevicePage:
+    statement = select(Device).where(Device.company_id == company_id)
+
+    if device_status is not None:
+        statement = statement.where(Device.status == device_status)
+
+    if search:
+        statement = statement.where(Device.name.icontains(search, autoescape=True))
+
+    statement = (
+        statement.order_by(Device.created_at.desc(), Device.id.desc())
+        .offset(offset)
+        .limit(limit + 1)
+    )
+    devices = session.scalars(statement).all()
+
+    return DevicePage(
+        items=[_to_device_details(device) for device in devices[:limit]],
+        limit=limit,
+        offset=offset,
+        has_more=len(devices) > limit,
+    )
 
 
 def _to_device_details(device: Device) -> DeviceDetails:

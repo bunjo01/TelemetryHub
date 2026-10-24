@@ -1,19 +1,25 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_database_session
-from app.api.schemas.devices import CreateDeviceRequest, DeviceResponse
+from app.api.schemas.devices import (
+    CreateDeviceRequest,
+    DeviceListQuery,
+    DeviceListResponse,
+    DeviceResponse,
+)
 from app.application.devices import (
     DeviceCompanyUnavailableError,
     DeviceNotFoundError,
     DevicePermissionError,
     create_device,
     get_device_details,
+    list_devices,
 )
 from app.infrastructure.repositories.users import CurrentUser
 
@@ -120,3 +126,61 @@ def get_device_details_endpoint(
         ) from None
 
     return DeviceResponse.model_validate(device, from_attributes=True)
+
+
+@router.get(
+    "",
+    response_model=DeviceListResponse,
+    responses={
+        401: {"description": "Invalid or missing credentials"},
+        403: {
+            "description": "Company owner or member access and an active company required"
+        },
+        503: {"description": "Device listing temporarily unavailable"},
+    },
+)
+def list_devices_endpoint(
+    query: Annotated[DeviceListQuery, Query()],
+    response: Response,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> DeviceListResponse:
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        page = list_devices(
+            session=session,
+            actor=current_user,
+            device_status=query.status,
+            search=query.search,
+            limit=query.limit,
+            offset=query.offset,
+        )
+    except DevicePermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company owner or member access required.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except DeviceCompanyUnavailableError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company is unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except (OperationalError, SQLAlchemyTimeoutError):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Device listing temporarily unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+
+    return DeviceListResponse(
+        items=[
+            DeviceResponse.model_validate(device, from_attributes=True)
+            for device in page.items
+        ],
+        limit=page.limit,
+        offset=page.offset,
+        has_more=page.has_more,
+    )
