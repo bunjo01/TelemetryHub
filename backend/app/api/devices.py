@@ -12,12 +12,14 @@ from app.api.schemas.devices import (
     DeviceListQuery,
     DeviceListResponse,
     DeviceResponse,
+    UpdateDeviceRequest,
 )
 from app.application.devices import (
     DeviceCompanyUnavailableError,
     DeviceNotFoundError,
     DevicePermissionError,
     create_device,
+    edit_device,
     get_device_details,
     list_devices,
 )
@@ -184,3 +186,59 @@ def list_devices_endpoint(
         offset=page.offset,
         has_more=page.has_more,
     )
+
+
+@router.patch(
+    "/{device_id}",
+    response_model=DeviceResponse,
+    responses={
+        401: {"description": "Invalid or missing credentials"},
+        403: {"description": "Owner access and an active company required"},
+        404: {"description": "Device not found"},
+        503: {"description": "Device editing temporarily unavailable"},
+    },
+)
+def edit_device_endpoint(
+    device_id: UUID,
+    payload: UpdateDeviceRequest,
+    response: Response,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> DeviceResponse:
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        device = edit_device(
+            session=session,
+            actor=current_user,
+            device_id=device_id,
+            name=payload.name,
+            description=payload.description,
+            update_description="description" in payload.model_fields_set,
+        )
+    except DevicePermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company owner access required.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except DeviceCompanyUnavailableError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company is unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except DeviceNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except (OperationalError, SQLAlchemyTimeoutError):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Device editing temporarily unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+
+    return DeviceResponse.model_validate(device, from_attributes=True)

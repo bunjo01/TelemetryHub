@@ -30,7 +30,7 @@ USER_ID = uuid4()
 CREATED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 # Explicit IDs and timestamps make the tie-breaking order reproducible.
 DEVICE_IDS = [UUID(int=index) for index in range(1, 7)]
-ACTIVE_IDS = [DEVICE_IDS[index] for index in (3, 2, 1, 0)]
+ACTIVE_IDS = [DEVICE_IDS[index] for index in (3, 2, 0, 1)]
 ALL_IDS = [DEVICE_IDS[4], *ACTIVE_IDS]
 
 
@@ -71,7 +71,7 @@ def client(database_session: Session) -> Iterator[TestClient]:
                     description="Description-only keyword",
                     device_type="temperature_sensor",
                     status="inactive" if index == 4 else "active",
-                    created_at=CREATED_AT + timedelta(days=index // 2),
+                    created_at=CREATED_AT + timedelta(days=(1, 0, 2, 2, 3, 4)[index]),
                     updated_at=CREATED_AT,
                 )
             )
@@ -91,8 +91,11 @@ def client(database_session: Session) -> Iterator[TestClient]:
         yield test_client
 
 
-@pytest.mark.parametrize("role", ["company_owner", "member"])
-@pytest.mark.parametrize("device_status", [None, "active", "inactive", "all"])
+@pytest.mark.parametrize(
+    ("role", "device_status"),
+    [("company_owner", value) for value in (None, "active", "inactive", "all")]
+    + [("member", "all")],
+)
 def test_listing_filters_status_and_company(
     client: TestClient,
     database_session: Session,

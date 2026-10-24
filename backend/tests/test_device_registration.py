@@ -176,6 +176,26 @@ def test_invalid_input_does_not_create_device(
     assert_no_devices(database_session)
 
 
+def test_duplicate_names_and_supplied_description_are_preserved(
+    client: TestClient, database_session: Session
+) -> None:
+    payload = {**PAYLOAD, "description": "Main warehouse freezer"}
+    first = client.post("/devices", json=payload)
+    second = client.post("/devices", json=payload)
+    assert first.status_code == second.status_code == 201
+    ids = {UUID(first.json()["id"]), UUID(second.json()["id"])}
+    assert len(ids) == 2
+    assert first.json()["description"] == payload["description"]
+    assert second.json()["description"] == payload["description"]
+    with database_session.begin():
+        devices = database_session.scalars(
+            select(Device).where(Device.id.in_(ids))
+        ).all()
+        assert len(devices) == 2
+        assert all(device.name == "Freezer sensor 01" for device in devices)
+        assert all(device.description == payload["description"] for device in devices)
+
+
 def test_authentication_is_required(
     client: TestClient,
     database_session: Session,

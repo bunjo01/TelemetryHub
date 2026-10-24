@@ -13,6 +13,7 @@ from app.infrastructure.repositories.devices import (
     insert_device,
     read_device_details,
     read_device_page,
+    update_device_details,
 )
 from app.infrastructure.repositories.users import CurrentUser
 
@@ -129,3 +130,41 @@ def list_devices(
         )
 
     return page
+
+
+def edit_device(
+    session: Session,
+    *,
+    actor: CurrentUser,
+    device_id: UUID,
+    name: str | None,
+    description: str | None,
+    update_description: bool,
+) -> DeviceDetails:
+    if (
+        actor.status != "active"
+        or actor.role != "company_owner"
+        or actor.company_id is None
+    ):
+        raise DevicePermissionError
+
+    with session.begin():
+        company_status = read_company_status_for_device_operation(
+            session,
+            actor.company_id,
+        )
+        if company_status != "active":
+            raise DeviceCompanyUnavailableError
+
+        device = update_device_details(
+            session,
+            company_id=actor.company_id,
+            device_id=device_id,
+            name=name,
+            description=description,
+            update_description=update_description,
+        )
+        if device is None:
+            raise DeviceNotFoundError
+
+    return device

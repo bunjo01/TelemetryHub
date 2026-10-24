@@ -99,6 +99,46 @@ def read_device_page(
     )
 
 
+def update_device_details(
+    session: Session,
+    *,
+    company_id: UUID,
+    device_id: UUID,
+    name: str | None,
+    description: str | None,
+    update_description: bool,
+) -> DeviceDetails | None:
+    statement = (
+        select(Device)
+        .where(
+            Device.id == device_id,
+            Device.company_id == company_id,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    device = session.scalar(statement)
+
+    if device is None:
+        return None
+
+    changed = False
+
+    if name is not None and name != device.name:
+        device.name = name
+        changed = True
+
+    if update_description and description != device.description:
+        device.description = description
+        changed = True
+
+    if changed:
+        session.flush()
+        session.refresh(device)
+
+    return _to_device_details(device)
+
+
 def _to_device_details(device: Device) -> DeviceDetails:
     return DeviceDetails(
         id=device.id,
