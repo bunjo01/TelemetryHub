@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -133,6 +134,35 @@ def update_device_details(
         changed = True
 
     if changed:
+        session.flush()
+        session.refresh(device)
+
+    return _to_device_details(device)
+
+
+def update_device_status(
+    session: Session,
+    *,
+    company_id: UUID,
+    device_id: UUID,
+    device_status: Literal["active", "inactive"],
+) -> DeviceDetails | None:
+    statement = (
+        select(Device)
+        .where(
+            Device.id == device_id,
+            Device.company_id == company_id,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    device = session.scalar(statement)
+
+    if device is None:
+        return None
+
+    if device.status != device_status:
+        device.status = device_status
         session.flush()
         session.refresh(device)
 

@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -22,6 +22,7 @@ from app.application.devices import (
     edit_device,
     get_device_details,
     list_devices,
+    set_device_status,
 )
 from app.infrastructure.repositories.users import CurrentUser
 
@@ -238,6 +239,101 @@ def edit_device_endpoint(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Device editing temporarily unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+
+    return DeviceResponse.model_validate(device, from_attributes=True)
+
+
+@router.post(
+    "/{device_id}/activate",
+    response_model=DeviceResponse,
+    responses={
+        401: {"description": "Invalid or missing credentials"},
+        403: {"description": "Owner access and an active company required"},
+        404: {"description": "Device not found"},
+        503: {"description": "Device status change temporarily unavailable"},
+    },
+)
+def activate_device_endpoint(
+    device_id: UUID,
+    response: Response,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> DeviceResponse:
+    return _set_device_status_response(
+        session=session,
+        actor=current_user,
+        device_id=device_id,
+        device_status="active",
+        response=response,
+    )
+
+
+@router.post(
+    "/{device_id}/deactivate",
+    response_model=DeviceResponse,
+    responses={
+        401: {"description": "Invalid or missing credentials"},
+        403: {"description": "Owner access and an active company required"},
+        404: {"description": "Device not found"},
+        503: {"description": "Device status change temporarily unavailable"},
+    },
+)
+def deactivate_device_endpoint(
+    device_id: UUID,
+    response: Response,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_database_session)],
+) -> DeviceResponse:
+    return _set_device_status_response(
+        session=session,
+        actor=current_user,
+        device_id=device_id,
+        device_status="inactive",
+        response=response,
+    )
+
+
+def _set_device_status_response(
+    *,
+    session: Session,
+    actor: CurrentUser,
+    device_id: UUID,
+    device_status: Literal["active", "inactive"],
+    response: Response,
+) -> DeviceResponse:
+    response.headers["Cache-Control"] = "no-store"
+
+    try:
+        device = set_device_status(
+            session=session,
+            actor=actor,
+            device_id=device_id,
+            device_status=device_status,
+        )
+    except DevicePermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company owner access required.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except DeviceCompanyUnavailableError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company is unavailable.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except DeviceNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found.",
+            headers={"Cache-Control": "no-store"},
+        ) from None
+    except (OperationalError, SQLAlchemyTimeoutError):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Device status change temporarily unavailable.",
             headers={"Cache-Control": "no-store"},
         ) from None
 
