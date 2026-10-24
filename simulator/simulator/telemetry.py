@@ -1,10 +1,13 @@
+import argparse
+import json
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
-from simulator.models import Device, DeviceType, SensorType, TelemetryEvent
-from simulator.seed import generate_uuid
+from simulator.models import Device, DeviceType, SeedData, SensorType, TelemetryEvent
+from simulator.seed import generate_uuid, load_seed
 
 
 def drift_toward(
@@ -115,3 +118,80 @@ def event_to_json_dict(event: TelemetryEvent) -> dict[str, Any]:
         "latitude": event.latitude,
         "longitude": event.longitude,
     }
+
+
+def all_devices(seed_data: SeedData) -> list[Device]:
+    return [
+        device
+        for company in seed_data.companies
+        for location in company.locations
+        for device in location.devices
+    ]
+
+
+def generate_all_events(
+    seed_data: SeedData,
+    start: datetime,
+    duration: timedelta,
+) -> list[TelemetryEvent]:
+    events: list[TelemetryEvent] = []
+
+    for device in all_devices(seed_data):
+        rng = device_rng(seed_data.seed, device, start)
+
+        events.extend(generate_device_events(rng, device, start, duration))
+
+    events.sort(key=lambda event: (event.event_time, str(event.device_id)))
+
+    return events
+
+
+def write_events(events: list[TelemetryEvent], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with path.open("w", encoding="utf-8") as file:
+        for event in events:
+            line = json.dumps(event_to_json_dict(event))
+            file.write(line + "\n")
+
+
+def parse_start(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise ValueError("start must be UTC, e.g. 2026-10-01T00:00:00Z")
+
+    return parsed
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate device telemetry from seed data.")
+
+    parser.add_argument(
+        "--seed-file",
+        type=Path,
+        default=Path("output/seed.json"),
+    )
+    parser.add_argument("--start", type=parse_start, required=True)
+    parser.add_argument("--duration-minutes", type=int, default=60)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("output/telemetry.jsonl"),
+    )
+
+    args = parser.parse_args()
+
+    seed_data = load_seed(args.seed_file)
+
+    events = generate_all_events(
+        seed_data,
+        args.start,
+        timedelta(minutes=args.duration_minutes),
+    )
+
+    write_events(events, args.output)
+
+
+if __name__ == "__main__":
+    main()

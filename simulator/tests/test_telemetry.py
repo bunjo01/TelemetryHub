@@ -11,11 +11,14 @@ from simulator.models import (
     DeviceType,
     SensorType,
 )
+from simulator.seed import COMPANY_SPECS, generate_seed
 from simulator.telemetry import (
     device_rng,
     drift_toward,
     event_to_json_dict,
+    generate_all_events,
     generate_device_events,
+    parse_start,
 )
 
 
@@ -179,6 +182,7 @@ def test_same_inputs_give_same_events() -> None:
 
     assert events_a == events_b
 
+
 def test_event_to_json_uses_z_for_utc() -> None:
     device = make_device(
         DeviceType.COLD_STORAGE_SENSOR,
@@ -195,3 +199,26 @@ def test_event_to_json_uses_z_for_utc() -> None:
     event_json = event_to_json_dict(events[0])
 
     assert event_json["event_time"] == "2026-10-01T00:00:00Z"
+
+
+def test_parse_start_rejects_non_utc() -> None:
+    with pytest.raises(ValueError):
+        parse_start("2026-10-01T02:00:00+02:00")
+
+
+def test_parse_start_accepts_z() -> None:
+    assert parse_start("2026-10-01T00:00:00Z") == START
+
+
+def test_generate_all_events_are_sorted() -> None:
+    seed_data = generate_seed(42, COMPANY_SPECS)
+
+    events = generate_all_events(
+        seed_data,
+        START,
+        timedelta(hours=1),
+    )
+
+    times = [event.event_time for event in events]
+
+    assert times == sorted(times)
