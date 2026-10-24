@@ -11,7 +11,6 @@ from simulator.models import (
     DeviceType,
     SensorType,
 )
-from simulator.seed import COMPANY_SPECS, generate_seed
 from simulator.telemetry import (
     device_rng,
     drift_toward,
@@ -20,6 +19,8 @@ from simulator.telemetry import (
     generate_device_events,
     parse_start,
 )
+
+from simulator.seed import COMPANY_SPECS, generate_seed
 
 
 def test_without_noise_moves_toward_target() -> None:
