@@ -42,7 +42,7 @@ app = FastAPI(title="IoTMonitor API", lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 async def handle_request_validation_error(
-    request: Request, error: RequestValidationError
+    request: Request, error: Exception
 ) -> JSONResponse:
     return JSONResponse(
         status_code=422,

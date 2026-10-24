@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.enums.device_types import DeviceType
@@ -37,6 +38,28 @@ def insert_device(
     session.add(device)
     session.flush()
 
+    return _to_device_details(device)
+
+
+def read_device_details(
+    session: Session,
+    *,
+    company_id: UUID,
+    device_id: UUID,
+) -> DeviceDetails | None:
+    statement = select(Device).where(
+        Device.id == device_id,
+        Device.company_id == company_id,
+    )
+    device = session.scalar(statement)
+
+    if device is None:
+        return None
+
+    return _to_device_details(device)
+
+
+def _to_device_details(device: Device) -> DeviceDetails:
     return DeviceDetails(
         id=device.id,
         company_id=device.company_id,

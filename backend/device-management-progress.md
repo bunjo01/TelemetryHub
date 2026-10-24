@@ -41,7 +41,7 @@ future additions across the backend, database constraint, and frontend.
 - [ ] Finalize API requests, responses, errors, pagination limits, and concurrent-update behavior for all device operations.
 - [x] Add the device model and database migration with initial constraints and company index.
 - [x] Implement device registration (`POST /devices`); initial integration tests and manual request passed.
-- [ ] Implement device details.
+- [x] Implement device details (`GET /devices/{device_id}`); PostgreSQL integration tests passed.
 - [ ] Implement listing with status filtering, name search, and pagination.
 - [ ] Implement editing of name and description.
 - [ ] Implement activation/deactivation, including repeated requests.
@@ -57,10 +57,29 @@ future additions across the backend, database constraint, and frontend.
 - The initial 13 PostgreSQL integration tests passed, and a manual request returned `201 Created`.
 - The development application role required `SELECT`, `INSERT`, and `UPDATE` on
   `public.devices`; this grant was applied to `iotmonitor` before the successful manual request.
-- Four failure/rollback cases and two concurrency cases have been added. Their
-  database execution is not yet confirmed; the assistant's runs skipped them because
-  `TEST_DATABASE_URL` was unset. Lint and formatting passed.
-- [ ] Confirm all 19 registration tests pass against the migrated test database.
+- Four failure/rollback cases and two concurrency cases passed alongside the
+  initial 13 registration tests in the user's PostgreSQL test run.
+- [x] Confirm all 19 registration tests pass against the migrated test database.
+
+## Device Details Progress
+
+- Active company owners and members can view their company's active and inactive
+  devices; system admins and users of inactive companies are denied access.
+- The repository scopes lookups by device ID and the authenticated user's company ID.
+  Missing devices and other-company devices return the same `404` response.
+- The application owns authorization and the transaction, holding a shared company
+  lock during the lookup to coordinate with company deactivation.
+- The API returns the existing device response schema with `Cache-Control: no-store`.
+  Invalid UUIDs return `422`, unavailable credentials (including inactive users)
+  return `401`, permission failures return `403`, and database connection/timeout
+  failures return a generic `503` response.
+- All 15 details test cases passed, covering response fields and timestamps,
+  active/inactive devices, owner/member access, company isolation, denied access,
+  invalid IDs, sanitized database failures, and recovery after injected failures.
+- On 2026-10-24, the user confirmed all 34 device tests passed against the test
+  database: 19 registration cases and 15 details cases. Lint and formatting passed.
+  This supersedes the assistant's earlier runs that skipped database tests because
+  `TEST_DATABASE_URL` was unset.
 
 ## Deferred
 

@@ -1,9 +1,21 @@
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
+from dotenv import dotenv_values
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+
+def pytest_configure() -> None:
+    if "TEST_DATABASE_URL" in os.environ:
+        return
+
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    url = dotenv_values(env_path).get("TEST_DATABASE_URL")
+    if url:
+        os.environ["TEST_DATABASE_URL"] = url
 
 
 @pytest.fixture
