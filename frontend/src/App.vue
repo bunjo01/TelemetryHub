@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ToastHost from "./components/notifications/ToastHost.vue";
 import BaseButton from "./components/ui/BaseButton.vue";
@@ -7,6 +8,9 @@ import { useAuthStore } from "./stores/auth.js";
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
+const canViewDevices = computed(() =>
+  ["company_owner", "member"].includes(auth.user?.role),
+);
 function focusMain() {
   const main = document.getElementById("main");
   main?.setAttribute("tabindex", "-1");
@@ -32,15 +36,21 @@ function signOut() {
         <span class="brand__symbol" aria-hidden="true">✧</span>
         Telemetry<span class="brand__suffix">Hub</span>
       </RouterLink>
-      <BaseButton
-        v-if="auth.isAuthenticated"
-        variant="secondary"
-        type="button"
-        compact
-        @click="signOut"
-      >
-        Sign out <span aria-hidden="true">↗</span>
-      </BaseButton>
+      <div v-if="auth.isAuthenticated" class="site-header__actions">
+        <nav v-if="canViewDevices" aria-label="Main navigation">
+          <RouterLink
+            :to="{ name: 'devices' }"
+            class="site-header__link"
+            active-class="site-header__link--active"
+          >
+            Devices
+          </RouterLink>
+        </nav>
+
+        <BaseButton variant="secondary" type="button" compact @click="signOut">
+          Sign out <span aria-hidden="true">↗</span>
+        </BaseButton>
+      </div>
       <span v-else class="site-header__tagline">YOUR WORLD. CONNECTED.</span>
     </header>
     <RouterView />
@@ -105,6 +115,39 @@ function signOut() {
   border-bottom: 1px solid var(--line);
 }
 
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.site-header__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.site-header__link:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.site-header__link--active {
+  color: var(--accent);
+}
+
+.site-header__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .site-header__tagline,
 .site-footer__coordinate {
   font-size: 0.65rem;
@@ -143,6 +186,14 @@ function signOut() {
 }
 
 @media (max-width: 600px) {
+  .site-header {
+    flex-wrap: wrap;
+  }
+
+  .site-header__actions {
+    margin-left: auto;
+  }
+
   .site-header__tagline,
   .site-footer__coordinate {
     display: none;
