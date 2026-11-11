@@ -1,4 +1,5 @@
 import { invalidResponse, request } from "./client.js";
+import { isUuid } from "./validation.js";
 
 export async function createCompany(name, token, signal) {
   const data = await request("/companies", { token, body: { name }, signal });
@@ -19,12 +20,7 @@ export async function searchCompanies(query, offset, token, signal) {
     typeof data.has_more !== "boolean" ||
     data.items.some(
       (item) =>
-        typeof item?.id !== "string" ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          item.id,
-        ) ||
-        typeof item.name !== "string" ||
-        !item.name,
+        !isUuid(item?.id) || typeof item.name !== "string" || !item.name,
     )
   )
     throw invalidResponse();

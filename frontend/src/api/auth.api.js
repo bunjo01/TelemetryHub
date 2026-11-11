@@ -1,4 +1,5 @@
 import { ApiError, invalidResponse, request } from "./client.js";
+import { isUuid } from "./validation.js";
 
 export const roleLabels = {
   system_admin: "System administrator",
@@ -32,13 +33,7 @@ export async function getProfile(token, signal) {
     !Object.hasOwn(roleLabels, data.role)
   )
     throw invalidResponse();
-  if (
-    data.role === "company_owner" &&
-    (typeof data.company_id !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        data.company_id,
-      ))
-  )
+  if (data.role === "company_owner" && !isUuid(data.company_id))
     throw invalidResponse();
   return {
     email: data.email,
