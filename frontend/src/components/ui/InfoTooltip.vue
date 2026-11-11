@@ -95,7 +95,10 @@ function handleKeydown(event) {
 }
 
 function handleScroll(event) {
-  if (!content.value?.contains(event.target)) close();
+  const isInsideTooltip =
+    event.target instanceof Node && content.value?.contains(event.target);
+
+  if (!isInsideTooltip) close();
 }
 
 onMounted(() => {
