@@ -5,11 +5,15 @@ export class ApiError extends Error {
   }
 }
 
-export async function request(path, { token, body, signal } = {}) {
+export async function request(path, { token, body, signal, method } = {}) {
+  const selectedMethod = method ?? (body === undefined ? "GET" : "POST");
+  const requestMethod = selectedMethod.toUpperCase();
+  const isReadRequest = requestMethod === "GET" || requestMethod === "HEAD";
+
   let response;
   try {
     response = await fetch(`/api${path}`, {
-      method: body === undefined ? "GET" : "POST",
+      method: requestMethod,
       headers: {
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -24,7 +28,7 @@ export async function request(path, { token, body, signal } = {}) {
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new ApiError(
-      body === undefined
+      isReadRequest
         ? "Unable to reach the server. Please try again."
         : "No response received. Your request may have completed; check before trying again.",
     );
