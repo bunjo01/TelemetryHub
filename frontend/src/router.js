@@ -2,6 +2,7 @@ import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "./stores/auth.js";
 import { useNotificationStore } from "./stores/notifications.js";
+import DeviceDetailsView from "./views/DeviceDetailsView.vue";
 import DeviceListView from "./views/DeviceListView.vue";
 import LoginView from "./views/LoginView.vue";
 import ProfileView from "./views/ProfileView.vue";
@@ -23,6 +24,15 @@ export function makeRouter(pinia, history = createWebHistory()) {
         path: "/devices",
         name: "devices",
         component: DeviceListView,
+        meta: {
+          requiresAuth: true,
+          roles: ["company_owner", "member"],
+        },
+      },
+      {
+        path: "/devices/:id",
+        name: "device-details",
+        component: DeviceDetailsView,
         meta: {
           requiresAuth: true,
           roles: ["company_owner", "member"],
@@ -53,6 +63,7 @@ export function makeRouter(pinia, history = createWebHistory()) {
       register: "Create account",
       login: "Sign in",
       devices: "Devices",
+      "device-details": "Device details",
     };
 
     document.title = `${titles[to.name] ?? "TelemetryHub"} · TelemetryHub`;
