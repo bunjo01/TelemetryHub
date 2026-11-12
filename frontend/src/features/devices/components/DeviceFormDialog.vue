@@ -1,7 +1,7 @@
 <script setup>
-import { nextTick, onBeforeUnmount, ref, useId } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import { useRouter } from "vue-router";
-import { createDevice } from "../../../api/devices.api.js";
+import { createDevice, updateDevice } from "../../../api/devices.api.js";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseDialog from "../../../components/ui/BaseDialog.vue";
 import BaseInput from "../../../components/ui/BaseInput.vue";
@@ -10,20 +10,58 @@ import BaseTextarea from "../../../components/ui/BaseTextarea.vue";
 import { useAuthStore } from "../../../stores/auth.js";
 import { deviceTypeLabels } from "../device-types.js";
 
-const emit = defineEmits(["close", "created"]);
+const props = defineProps({
+  mode: {
+    type: String,
+    default: "create",
+    validator: (value) => ["create", "edit"].includes(value),
+  },
+  device: {
+    type: Object,
+    default: null,
+  },
+});
+
+const emit = defineEmits(["close", "created", "updated"]);
+const isEditing = computed(() => props.mode === "edit");
 const auth = useAuthStore();
 const router = useRouter();
 const formId = useId();
 
-const name = ref("");
-const deviceType = ref("");
-const description = ref("");
+const name = ref(props.device?.name ?? "");
+const deviceType = ref(props.device?.deviceType ?? "");
+const description = ref(props.device?.description ?? "");
 const nameInput = ref(null);
 const typeInput = ref(null);
 const descriptionInput = ref(null);
 const errors = ref({});
 const submissionError = ref("");
 const isSaving = ref(false);
+
+const changes = computed(() => {
+  if (!isEditing.value) return {};
+
+  const result = {};
+  const trimmedName = name.value.trim();
+
+  if (trimmedName !== props.device.name) {
+    result.name = trimmedName;
+  }
+
+  if (description.value !== (props.device.description ?? "")) {
+    result.description = description.value || null;
+  }
+
+  return result;
+});
+
+const hasChanges = computed(() => Object.keys(changes.value).length > 0);
+
+const submitLabel = computed(() => {
+  if (isSaving.value) return isEditing.value ? "Saving…" : "Adding…";
+
+  return isEditing.value ? "Save changes" : "Add device";
+});
 
 const typeOptions = Object.entries(deviceTypeLabels).map(([value, label]) => ({
   value,
@@ -52,7 +90,7 @@ async function validate() {
     nextErrors.name = "Use 100 characters or fewer.";
   }
 
-  if (!Object.hasOwn(deviceTypeLabels, deviceType.value)) {
+  if (!isEditing.value && !Object.hasOwn(deviceTypeLabels, deviceType.value)) {
     nextErrors.deviceType = "Choose a device type.";
   }
 
@@ -76,7 +114,13 @@ async function validate() {
 }
 
 async function submit() {
-  if (isSaving.value || isValidating) return;
+  if (
+    isSaving.value ||
+    isValidating ||
+    (isEditing.value && !hasChanges.value)
+  ) {
+    return;
+  }
 
   isValidating = true;
   const isValid = await validate();
@@ -89,19 +133,27 @@ async function submit() {
   pendingRequest = controller;
 
   try {
-    const device = await createDevice(
-      {
-        name: name.value.trim(),
-        deviceType: deviceType.value,
-        description: description.value || null,
-      },
-      auth.token,
-      controller.signal,
-    );
+    const device = isEditing.value
+      ? await updateDevice(
+          props.device.id,
+          changes.value,
+          auth.token,
+          controller.signal,
+        )
+      : await createDevice(
+          {
+            name: name.value.trim(),
+            deviceType: deviceType.value,
+            description: description.value || null,
+          },
+          auth.token,
+          controller.signal,
+        );
 
     if (isDisposed || controller.signal.aborted) return;
 
-    emit("created", device);
+    if (isEditing.value) emit("updated", device);
+    else emit("created", device);
   } catch (failure) {
     if (isDisposed || controller.signal.aborted) return;
 
@@ -115,8 +167,9 @@ async function submit() {
     }
 
     if (!failure.status || failure.status >= 500) {
-      submissionError.value =
-        "We could not confirm whether the device was created. Check the device list before trying again.";
+      submissionError.value = isEditing.value
+        ? "We could not confirm whether your changes were saved. Check the device details before trying again."
+        : "We could not confirm whether the device was created. Check the device list before trying again.";
     } else {
       submissionError.value = failure.message;
     }
@@ -135,7 +188,7 @@ onBeforeUnmount(() => {
 <template>
   <BaseDialog
     v-slot="{ close }"
-    title="Add device"
+    :title="isEditing ? 'Edit device' : 'Add device'"
     :close-disabled="isSaving"
     :initial-focus="focusName"
     @close="emit('close')"
@@ -177,7 +230,15 @@ onBeforeUnmount(() => {
         <label class="device-form__label" :for="`${formId}-type`">
           Device type
         </label>
+        <BaseInput
+          v-if="isEditing"
+          :id="`${formId}-type`"
+          :model-value="deviceTypeLabels[deviceType]"
+          disabled
+          :aria-describedby="`${formId}-type-hint`"
+        />
         <BaseSelect
+          v-else
           :id="`${formId}-type`"
           ref="typeInput"
           v-model="deviceType"
@@ -245,7 +306,9 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
-      <p class="supporting-text device-form__hint">New devices start active.</p>
+      <p v-if="!isEditing" class="supporting-text device-form__hint">
+        New devices start active.
+      </p>
 
       <p
         v-if="submissionError"
@@ -257,8 +320,12 @@ onBeforeUnmount(() => {
 
       <div class="device-form__actions">
         <BaseButton :disabled="isSaving" @click="close"> Cancel </BaseButton>
-        <BaseButton variant="primary" type="submit" :disabled="isSaving">
-          {{ isSaving ? "Adding…" : "Add device" }}
+        <BaseButton
+          variant="primary"
+          type="submit"
+          :disabled="isSaving || (isEditing && !hasChanges)"
+        >
+          {{ submitLabel }}
         </BaseButton>
       </div>
     </form>
