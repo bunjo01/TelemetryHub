@@ -22,6 +22,8 @@ const query = computed(() => readDeviceListQuery(route.query));
 const listQuery = computed(() => createDeviceListQuery(query.value));
 const search = ref(query.value.search);
 const isSearchPending = ref(false);
+const isRecoveringPage = ref(false);
+let recoveryTarget = null;
 const statusOptions = [
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
@@ -30,7 +32,9 @@ const statusOptions = [
 
 const { devices, hasMore, isLoading, error, refresh } = useDeviceList(query);
 
-const isBusy = computed(() => isLoading.value || isSearchPending.value);
+const isBusy = computed(
+  () => isLoading.value || isSearchPending.value || isRecoveringPage.value,
+);
 const hasPrevious = computed(() => query.value.offset > 0);
 const hasNext = computed(
   () =>
@@ -123,6 +127,15 @@ watch(
     stopSearch();
     search.value = query.value.search;
 
+    if (
+      recoveryTarget &&
+      (query.value.search !== recoveryTarget.search ||
+        query.value.status !== recoveryTarget.status ||
+        query.value.offset !== recoveryTarget.offset)
+    ) {
+      recoveryTarget = null;
+    }
+
     const normalized = listQuery.value;
     const keys = Object.keys(currentQuery);
     const isNormalized =
@@ -138,6 +151,46 @@ watch(
   },
   { immediate: true },
 );
+
+watch([isLoading, isSearchPending, isRecoveringPage], async () => {
+  if (
+    isLoading.value ||
+    isSearchPending.value ||
+    isRecoveringPage.value ||
+    !auth.token ||
+    route.name !== "devices" ||
+    search.value.trim() !== query.value.search
+  ) {
+    return;
+  }
+
+  if (error.value || devices.value.length || query.value.offset === 0) {
+    recoveryTarget = null;
+    return;
+  }
+
+  const isPreviousRecoveryPage =
+    recoveryTarget &&
+    query.value.search === recoveryTarget.search &&
+    query.value.status === recoveryTarget.status &&
+    query.value.offset === recoveryTarget.offset;
+
+  const offset = isPreviousRecoveryPage
+    ? 0
+    : Math.max(0, query.value.offset - devicePageSize);
+
+  recoveryTarget = { ...query.value, offset };
+  isRecoveringPage.value = true;
+
+  try {
+    await router.replace({
+      name: "devices",
+      query: createDeviceListQuery(recoveryTarget),
+    });
+  } finally {
+    isRecoveringPage.value = false;
+  }
+});
 
 watch(error, async (failure) => {
   if (failure?.status !== 401) return;

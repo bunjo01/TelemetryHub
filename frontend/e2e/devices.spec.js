@@ -296,22 +296,130 @@ test("distinguishes empty status, empty company, and no search matches", async (
   ).toBeDisabled();
 });
 
-test("allows returning from an empty later page", async ({ page }) => {
-  await mockDevices(page);
+test("automatically returns from an empty later page without adding history", async ({
+  page,
+}) => {
+  const requests = await mockDevices(page);
   await signIn(page);
   await navigateInSession(page, "/devices?offset=40");
 
-  await expect(
-    page.getByText(
-      "There are no devices on this page. Go back to the previous page.",
-    ),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/devices\?offset=20$/);
+  await expect(deviceLinks(page)).toHaveCount(5);
+  expect(requests.map((query) => query.offset)).toEqual(["40", "20"]);
   await expect(
     page.getByRole("button", { name: "Next", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Previous", exact: true }).click();
-  await expect(page).toHaveURL(/\/devices\?offset=20$/);
-  await expect(deviceLinks(page)).toHaveCount(5);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/profile$/);
+});
+
+test("bounds empty-page recovery and preserves filters", async ({ page }) => {
+  const requests = await mockDevices(page);
+  await signIn(page);
+  await navigateInSession(
+    page,
+    "/devices?search=Sensor&status=inactive&offset=1000000",
+  );
+  await expect(page).toHaveURL("/devices?search=Sensor&status=inactive");
+  await expect(deviceLinks(page)).toHaveCount(20);
+  expect(requests.map((query) => query.offset)).toEqual([
+    "1000000",
+    "999980",
+    "0",
+  ]);
+  expect(
+    requests.every(
+      (query) => query.search === "Sensor" && query.status === "inactive",
+    ),
+  ).toBe(true);
+  await expect(page.getByLabel("Search devices", { exact: true })).toHaveValue(
+    "Sensor",
+  );
+  await expect(
+    page.getByRole("combobox", { name: "Status", exact: true }),
+  ).toHaveText("Inactive");
+});
+
+test("stops at the first page when the company has no devices", async ({
+  page,
+}) => {
+  const requests = await mockDevices(page, []);
+  await signIn(page);
+  await navigateInSession(page, "/devices?status=all&offset=40");
+  await expect(page).toHaveURL("/devices?status=all");
+  await expect(
+    page.getByText("Your company has no devices yet."),
+  ).toBeVisible();
+  expect(requests.map((query) => query.offset)).toEqual(["40", "20", "0"]);
+  await expect(
+    page.getByRole("button", { name: "Previous", exact: true }),
+  ).toBeDisabled();
+});
+
+for (const status of [403, 503]) {
+  test(`does not change pages when recovery receives ${status}`, async ({
+    page,
+  }) => {
+    const offsets = [];
+    await page.route("**/api/devices?*", (route) => {
+      const params = new URL(route.request().url()).searchParams;
+      offsets.push(params.get("offset"));
+      if (params.get("offset") === "40") {
+        return route.fulfill({ json: listResponse(params) });
+      }
+      return route.fulfill({ status, json: {} });
+    });
+    await signIn(page);
+    await navigateInSession(page, "/devices?offset=40");
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page).toHaveURL("/devices?offset=20");
+    expect(offsets).toEqual(["40", "20"]);
+    await expect(deviceLinks(page)).toHaveCount(0);
+  });
+}
+
+test("lets pending search replace an empty page without recovering the old query", async ({
+  page,
+}) => {
+  const requests = [];
+  let release;
+  let hasStarted = false;
+  const pending = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/devices?*", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    requests.push(Object.fromEntries(params));
+    if (params.get("offset") === "40") {
+      hasStarted = true;
+      await pending;
+    }
+    await route.fulfill({ json: listResponse(params) });
+  });
+  try {
+    await signIn(page);
+    await page.clock.install();
+    await page.clock.pauseAt(new Date());
+    await navigateInSession(page, "/devices?offset=40");
+    await expect.poll(() => hasStarted).toBe(true);
+    const search = page.getByLabel("Search devices", { exact: true });
+    await search.fill("Sensor 01");
+    const response = page.waitForResponse(
+      (result) => new URL(result.url()).searchParams.get("offset") === "40",
+    );
+    release();
+    await response;
+    await search.press("Enter");
+    await expect(
+      page.getByRole("link", { name: "Sensor 01", exact: true }),
+    ).toBeVisible();
+    await page.clock.runFor(300);
+    expect(requests.map((query) => query.offset)).toEqual(["40", "0"]);
+    expect(requests.at(-1).search).toBe("Sensor 01");
+    await expect(search).toBeFocused();
+  } finally {
+    release();
+  }
 });
 
 test("cancels a pending search when leaving the list", async ({ page }) => {
