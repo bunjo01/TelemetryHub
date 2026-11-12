@@ -1,5 +1,24 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useAttrs,
+  useId,
+  watch,
+} from "vue";
+
+defineOptions({ inheritAttrs: false });
+
+const attrs = useAttrs();
+
+function controlAttributes() {
+  const attributes = { ...attrs };
+  delete attributes.class;
+  delete attributes.style;
+  return attributes;
+}
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -135,8 +154,9 @@ defineExpose({ focus });
 </script>
 
 <template>
-  <div ref="root" class="select">
+  <div ref="root" class="select" :class="$attrs.class" :style="$attrs.style">
     <button
+      v-bind="controlAttributes()"
       :id="id"
       ref="trigger"
       class="select__trigger"
