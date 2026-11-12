@@ -5,6 +5,7 @@ import { devicePageSize } from "../api/devices.api.js";
 import BaseButton from "../components/ui/BaseButton.vue";
 import BaseInput from "../components/ui/BaseInput.vue";
 import BaseSelect from "../components/ui/BaseSelect.vue";
+import DeviceFormDialog from "../features/devices/components/DeviceFormDialog.vue";
 import DeviceList from "../features/devices/components/DeviceList.vue";
 import {
   createDeviceListQuery,
@@ -13,10 +14,14 @@ import {
 } from "../features/devices/device-list-query.js";
 import { useDeviceList } from "../features/devices/useDeviceList.js";
 import { useAuthStore } from "../stores/auth.js";
+import { useNotificationStore } from "../stores/notifications.js";
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const notifications = useNotificationStore();
+const isOwner = computed(() => auth.user?.role === "company_owner");
+const isDeviceFormOpen = ref(false);
 
 const query = computed(() => readDeviceListQuery(route.query));
 const listQuery = computed(() => createDeviceListQuery(query.value));
@@ -81,6 +86,31 @@ const emptyMessage = computed(() => {
 });
 
 let searchTimer;
+
+async function handleDeviceCreated(device) {
+  const returnQuery = { ...listQuery.value };
+  isDeviceFormOpen.value = false;
+
+  const failure = await router.push({
+    name: "device-details",
+    params: { id: device.id },
+    query: returnQuery,
+  });
+
+  if (
+    failure ||
+    route.name !== "device-details" ||
+    route.params.id !== device.id
+  ) {
+    return;
+  }
+
+  notifications.show({
+    key: "device-create",
+    variant: "success",
+    message: `${device.name} was created successfully.`,
+  });
+}
 
 function stopSearch() {
   clearTimeout(searchTimer);
@@ -208,10 +238,21 @@ onBeforeUnmount(stopSearch);
 <template>
   <main id="main" class="devices-page">
     <header class="devices-page__heading">
-      <h1 class="devices-page__title" tabindex="-1">Devices</h1>
-      <p class="supporting-text devices-page__intro">
-        Browse and manage your company's devices.
-      </p>
+      <div class="devices-page__heading-copy">
+        <h1 class="devices-page__title" tabindex="-1">Devices</h1>
+        <p class="supporting-text devices-page__intro">
+          Browse and manage your company's devices.
+        </p>
+      </div>
+      <BaseButton
+        v-if="isOwner"
+        variant="primary"
+        aria-haspopup="dialog"
+        :disabled="isBusy || !!error"
+        @click="isDeviceFormOpen = true"
+      >
+        Add device
+      </BaseButton>
     </header>
 
     <form
@@ -299,6 +340,11 @@ onBeforeUnmount(stopSearch);
         Next
       </BaseButton>
     </nav>
+    <DeviceFormDialog
+      v-if="isOwner && isDeviceFormOpen"
+      @close="isDeviceFormOpen = false"
+      @created="handleDeviceCreated"
+    />
   </main>
 </template>
 
@@ -310,7 +356,16 @@ onBeforeUnmount(stopSearch);
 }
 
 .devices-page__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 2rem;
+}
+
+.devices-page__heading-copy {
+  min-width: 0;
 }
 
 .devices-page__title {
