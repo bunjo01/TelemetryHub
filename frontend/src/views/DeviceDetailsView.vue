@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BaseButton from "../components/ui/BaseButton.vue";
 import BaseIconButton from "../components/ui/BaseIconButton.vue";
 import InfoTooltip from "../components/ui/InfoTooltip.vue";
+import DeviceFormDialog from "../features/devices/components/DeviceFormDialog.vue";
 import DeviceStatus from "../features/devices/components/DeviceStatus.vue";
 import {
   createDeviceListQuery,
@@ -18,6 +19,8 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const notifications = useNotificationStore();
+const isOwner = computed(() => auth.user?.role === "company_owner");
+const isEditOpen = ref(false);
 
 const deviceId = computed(() => route.params.id);
 const listQuery = computed(() =>
@@ -54,6 +57,26 @@ const canRetry = computed(
 function formatTimestamp(value) {
   return dateFormatter.format(new Date(value));
 }
+
+async function handleDeviceUpdated(updatedDevice) {
+  if (isUnmounted || updatedDevice.id !== deviceId.value) return;
+
+  device.value = updatedDevice;
+  isEditOpen.value = false;
+  await nextTick();
+
+  if (isUnmounted || updatedDevice.id !== deviceId.value) return;
+
+  notifications.show({
+    key: "device-edit",
+    variant: "success",
+    message: "Device changes saved.",
+  });
+}
+
+watch(deviceId, () => {
+  isEditOpen.value = false;
+});
 
 async function copyDeviceId() {
   if (!device.value || isCopying.value) return;
@@ -133,10 +156,19 @@ onBeforeUnmount(() => {
     </RouterLink>
 
     <header class="device-details__heading">
-      <h1 class="device-details__title" tabindex="-1">
-        {{ device?.name ?? "Device details" }}
-      </h1>
-      <DeviceStatus v-if="device" :status="device.status" />
+      <div class="device-details__heading-main">
+        <h1 class="device-details__title" tabindex="-1">
+          {{ device?.name ?? "Device details" }}
+        </h1>
+        <DeviceStatus v-if="device" :status="device.status" />
+      </div>
+      <BaseButton
+        v-if="isOwner && device"
+        aria-haspopup="dialog"
+        @click="isEditOpen = true"
+      >
+        Edit device
+      </BaseButton>
     </header>
 
     <p
@@ -230,6 +262,14 @@ onBeforeUnmount(() => {
         </dl>
       </div>
     </section>
+    <DeviceFormDialog
+      v-if="isOwner && device && isEditOpen"
+      :key="device.id"
+      mode="edit"
+      :device="device"
+      @close="isEditOpen = false"
+      @updated="handleDeviceUpdated"
+    />
   </main>
 </template>
 
@@ -271,6 +311,15 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.75rem 1rem;
   margin-bottom: 1.5rem;
+}
+
+.device-details__heading-main {
+  display: flex;
+  flex: 1 1 20rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  min-width: 0;
 }
 
 .device-details__title {

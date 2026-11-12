@@ -76,6 +76,9 @@ for (const role of ["company_owner", "member"]) {
     await openDetails(page);
 
     await expect(page).toHaveTitle("Device details · TelemetryHub");
+    await expect(
+      page.getByRole("button", { name: "Edit device", exact: true }),
+    ).toHaveCount(role === "company_owner" ? 1 : 0);
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
     await expect(page.getByText("Inactive", { exact: true })).toBeVisible();
     const information = page.getByRole("region", {
@@ -104,6 +107,195 @@ for (const role of ["company_owner", "member"]) {
     ).toBeEnabled();
   });
 }
+
+test("edits an inactive device in place using the server response and preserves return context", async ({
+  page,
+}) => {
+  const writes = [];
+  let reads = 0;
+  let stored = { ...device };
+  await page.route(`**/api/devices/${device.id}`, (route) => {
+    expect(route.request().headers().authorization).toBe("Bearer test-token");
+    if (route.request().method() === "PATCH") {
+      const changes = route.request().postDataJSON();
+      writes.push(changes);
+      stored = { ...stored, ...changes, updated_at: "2026-11-12T15:00:00Z" };
+    } else {
+      expect(route.request().method()).toBe("GET");
+      reads += 1;
+    }
+    return route.fulfill({ json: stored });
+  });
+  await signIn(page);
+  const path = `/devices/${device.id}?search=Freezer&status=inactive&offset=20`;
+  await navigateInSession(page, path);
+  const edit = page.getByRole("button", { name: "Edit device", exact: true });
+  await edit.click();
+  const dialog = page.getByRole("dialog", { name: "Edit device", exact: true });
+  const name = dialog.getByLabel("Device name", { exact: true });
+  const description = dialog.getByLabel("Description (optional)", {
+    exact: true,
+  });
+  const save = dialog.getByRole("button", {
+    name: "Save changes",
+    exact: true,
+  });
+  await expect(name).toBeFocused();
+  await expect(name).toHaveValue(device.name);
+  await expect(description).toHaveValue(device.description);
+  await expect(dialog.getByLabel("Device type", { exact: true })).toHaveValue(
+    "Temperature sensor",
+  );
+  await expect(
+    dialog.getByLabel("Device type", { exact: true }),
+  ).toBeDisabled();
+  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  await expect(save).toBeDisabled();
+  await name.fill("  Renamed freezer  ");
+  await description.fill("");
+  await save.click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(path);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Renamed freezer",
+  );
+  await expect(
+    page.getByText("No description provided.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Inactive", { exact: true })).toBeVisible();
+  await expect(page.locator("time").nth(1)).toHaveText("12 Nov 2026, 16:00");
+  await expect(
+    page.getByText("Device changes saved.", { exact: true }),
+  ).toBeVisible();
+  await expect(edit).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: "Back to devices" }),
+  ).toHaveAttribute(
+    "href",
+    "/devices?search=Freezer&status=inactive&offset=20",
+  );
+  expect(writes).toEqual([{ name: "Renamed freezer", description: null }]);
+  expect(reads).toBe(1);
+
+  await edit.click();
+  await expect(name).toHaveValue("Renamed freezer");
+  await expect(description).toHaveValue("");
+  await expect(save).toBeDisabled();
+});
+
+test("cancels edits without changing the device and discards the draft on reopen", async ({
+  page,
+}) => {
+  await mockDetails(page);
+  await signIn(page);
+  await openDetails(page);
+  const edit = page.getByRole("button", { name: "Edit device", exact: true });
+  await edit.click();
+  const dialog = page.getByRole("dialog", { name: "Edit device", exact: true });
+  await dialog.getByLabel("Device name", { exact: true }).fill("Unsaved name");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(edit).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(device.name);
+  await edit.click();
+  await expect(dialog.getByLabel("Device name", { exact: true })).toHaveValue(
+    device.name,
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Save changes", exact: true }),
+  ).toBeDisabled();
+});
+
+for (const status of [403, 404, 503]) {
+  test(`preserves the edit draft and existing details after a ${status} response`, async ({
+    page,
+  }) => {
+    let writes = 0;
+    await page.route(`**/api/devices/${device.id}`, (route) => {
+      if (route.request().method() === "PATCH") {
+        writes += 1;
+        return route.fulfill({
+          status,
+          json: { detail: "private backend information" },
+        });
+      }
+      return route.fulfill({ json: device });
+    });
+    await signIn(page);
+    await openDetails(page);
+    await page
+      .getByRole("button", { name: "Edit device", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: "Edit device",
+      exact: true,
+    });
+    const name = dialog.getByLabel("Device name", { exact: true });
+    await name.fill("Draft name");
+    await dialog
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    if (status === 503)
+      await expect(dialog.getByRole("alert")).toContainText(
+        "Check the device details before trying again.",
+      );
+    await expect(dialog.getByText("private backend information")).toHaveCount(
+      0,
+    );
+    await expect(name).toHaveValue("Draft name");
+    await expect(
+      dialog.getByRole("button", { name: "Save changes", exact: true }),
+    ).toBeEnabled();
+    expect(writes).toBe(1);
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      device.name,
+    );
+  });
+}
+
+test("expires the session when saving an edit returns 401", async ({
+  page,
+}) => {
+  await page.route(`**/api/devices/${device.id}`, (route) =>
+    route.fulfill({
+      status: route.request().method() === "PATCH" ? 401 : 200,
+      json: route.request().method() === "PATCH" ? {} : device,
+    }),
+  );
+  await signIn(page);
+  await openDetails(page);
+  await page.getByRole("button", { name: "Edit device", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit device", exact: true });
+  await dialog.getByLabel("Device name", { exact: true }).fill("Draft name");
+  await dialog
+    .getByRole("button", { name: "Save changes", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/\?expired=1$/);
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("alert")).toContainText("session has expired");
+});
+
+test("closes an open edit session when navigating to a different device", async ({
+  page,
+}) => {
+  await mockDetails(page);
+  await signIn(page);
+  await openDetails(page);
+  await page.getByRole("button", { name: "Edit device", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit device", exact: true });
+  await dialog
+    .getByLabel("Device name", { exact: true })
+    .fill("Old device draft");
+  await openDetails(page, devices[1]);
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit device", exact: true }).click();
+  await expect(dialog.getByLabel("Device name", { exact: true })).toHaveValue(
+    devices[1].name,
+  );
+});
 
 test("restores search, status and pagination through the return link and browser history", async ({
   page,
