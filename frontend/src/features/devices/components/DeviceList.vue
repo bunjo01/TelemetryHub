@@ -10,7 +10,9 @@ defineProps({
     type: Object,
     required: true,
   },
+  canManage: { type: Boolean, default: false },
 });
+defineEmits(["updated"]);
 </script>
 
 <template>
@@ -18,7 +20,7 @@ defineProps({
     <div class="device-list__heading" aria-hidden="true">
       <span>Name / description</span>
       <span>Type</span>
-      <span>Status</span>
+      <span class="device-list__status-heading">Status</span>
     </div>
 
     <ul class="device-list__items" aria-label="Devices">
@@ -26,6 +28,8 @@ defineProps({
         v-for="device in devices"
         :key="device.id"
         :device="device"
+        :can-manage="canManage"
+        @updated="$emit('updated', $event)"
         :to="{
           path: `/devices/${device.id}`,
           query: listQuery,
@@ -42,13 +46,17 @@ defineProps({
 
 .device-list__heading {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 12rem 6rem;
+  grid-template-columns: minmax(0, 1fr) 10rem 12rem;
   gap: 1.5rem;
   padding: 0 calc(1.25rem + 1px);
   margin-bottom: 0.75rem;
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 500;
+}
+
+.device-list__status-heading {
+  text-align: right;
 }
 
 .device-list__items {

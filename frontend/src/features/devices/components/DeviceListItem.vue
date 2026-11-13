@@ -3,6 +3,7 @@ import { useId } from "vue";
 import { RouterLink } from "vue-router";
 import { deviceTypeLabels } from "../device-types.js";
 import DeviceStatus from "./DeviceStatus.vue";
+import DeviceStatusControl from "./DeviceStatusControl.vue";
 
 defineProps({
   device: {
@@ -13,7 +14,9 @@ defineProps({
     type: [String, Object],
     required: true,
   },
+  canManage: { type: Boolean, default: false },
 });
+defineEmits(["updated"]);
 
 const nameId = `${useId()}-name`;
 </script>
@@ -38,34 +41,47 @@ const nameId = `${useId()}-name`;
       <span class="device-list-item__type">
         {{ deviceTypeLabels[device.deviceType] }}
       </span>
-
-      <DeviceStatus :status="device.status" class="device-list-item__status" />
     </RouterLink>
+    <div class="device-list-item__status">
+      <DeviceStatusControl
+        v-if="canManage"
+        :device="device"
+        @updated="$emit('updated', $event)"
+      />
+      <DeviceStatus v-else :status="device.status" />
+    </div>
   </li>
 </template>
 
 <style scoped lang="scss">
 .device-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12rem;
+  align-items: center;
+  gap: 1.5rem;
   min-width: 0;
   list-style: none;
+  padding-right: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background-color: var(--panel);
+  transition: background-color 0.15s;
+}
+
+.device-list-item:hover,
+.device-list-item:focus-within {
+  background-color: #162331;
 }
 
 .device-list-item__link {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 12rem 6rem;
+  grid-template-columns: minmax(0, 1fr) 10rem;
   align-items: center;
   gap: 1.5rem;
   padding: 1.25rem;
-  border: 1px solid var(--line);
   border-radius: 0.5rem;
-  background-color: var(--panel);
   color: var(--text);
   text-decoration: none;
-  transition: background-color 0.15s;
-}
-
-.device-list-item__link:hover {
-  background-color: #162331;
 }
 
 .device-list-item__link:focus-visible {
@@ -106,12 +122,20 @@ const nameId = `${useId()}-name`;
 }
 
 .device-list-item__status {
-  justify-self: start;
+  min-width: 0;
+  padding-block: 1rem;
+  justify-self: end;
 }
 
 @media (max-width: 700px) {
+  .device-list-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-right: 0;
+  }
+
   .device-list-item__link {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.85rem 1rem;
     padding: 1rem;
   }
@@ -121,12 +145,13 @@ const nameId = `${useId()}-name`;
   }
 
   .device-list-item__status {
-    justify-self: end;
+    padding: 0 1rem 1rem;
+    justify-self: start;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .device-list-item__link {
+  .device-list-item {
     transition: none;
   }
 }

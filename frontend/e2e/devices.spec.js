@@ -123,6 +123,15 @@ for (const role of ["company_owner", "member"]) {
     await first.focus();
     await expect(first).toBeFocused();
     await page.keyboard.press("Tab");
+    if (role === "company_owner") {
+      await expect(
+        page.getByRole("switch", {
+          name: "Sensor 01: device active",
+          exact: true,
+        }),
+      ).toBeFocused();
+      await page.keyboard.press("Tab");
+    }
     await expect(
       page.getByRole("link", { name: "Sensor 02", exact: true }),
     ).toBeFocused();
@@ -311,6 +320,34 @@ test("automatically returns from an empty later page without adding history", as
   ).toBeDisabled();
   await page.goBack();
   await expect(page).toHaveURL(/\/profile$/);
+});
+
+test("returns to the previous page after deactivating its last active device", async ({
+  page,
+}) => {
+  const source = devices.slice(0, 21).map((device) => ({ ...device }));
+  const requests = await mockDevices(page, source);
+  const last = source[20];
+  await page.route(`**/api/devices/${last.id}/deactivate`, (route) => {
+    last.status = "inactive";
+    return route.fulfill({ json: last });
+  });
+  await signIn(page);
+  await navigateInSession(page, "/devices?offset=20");
+  await expect(deviceLinks(page)).toHaveCount(1);
+  await page
+    .getByRole("switch", { name: `${last.name}: device active`, exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Deactivate device", exact: true })
+    .click();
+  await expect(page).toHaveURL("/devices");
+  await expect(deviceLinks(page)).toHaveCount(20);
+  expect(requests.map((query) => query.offset)).toEqual(["20", "20", "0"]);
+  await expect(
+    page.getByRole("link", { name: last.name, exact: true }),
+  ).toHaveCount(0);
 });
 
 test("bounds empty-page recovery and preserves filters", async ({ page }) => {

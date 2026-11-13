@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { devicePageSize } from "../api/devices.api.js";
 import BaseButton from "../components/ui/BaseButton.vue";
@@ -22,6 +22,7 @@ const auth = useAuthStore();
 const notifications = useNotificationStore();
 const isOwner = computed(() => auth.user?.role === "company_owner");
 const isDeviceFormOpen = ref(false);
+const heading = ref(null);
 
 const query = computed(() => readDeviceListQuery(route.query));
 const listQuery = computed(() => createDeviceListQuery(query.value));
@@ -86,6 +87,22 @@ const emptyMessage = computed(() => {
 });
 
 let searchTimer;
+
+async function handleStatusUpdated(updatedDevice) {
+  if (
+    query.value.status === "all" ||
+    query.value.status === updatedDevice.status
+  ) {
+    devices.value = devices.value.map((device) =>
+      device.id === updatedDevice.id ? updatedDevice : device,
+    );
+    return;
+  }
+  await refresh();
+  await nextTick();
+  if (document.activeElement === document.body)
+    heading.value?.focus({ preventScroll: true });
+}
 
 async function handleDeviceCreated(device) {
   const returnQuery = { ...listQuery.value };
@@ -239,7 +256,7 @@ onBeforeUnmount(stopSearch);
   <main id="main" class="devices-page">
     <header class="devices-page__heading">
       <div class="devices-page__heading-copy">
-        <h1 class="devices-page__title" tabindex="-1">Devices</h1>
+        <h1 ref="heading" class="devices-page__title" tabindex="-1">Devices</h1>
         <p class="supporting-text devices-page__intro">
           Browse and manage your company's devices.
         </p>
@@ -318,6 +335,8 @@ onBeforeUnmount(stopSearch);
           v-if="devices.length"
           :devices="devices"
           :list-query="listQuery"
+          :can-manage="isOwner"
+          @updated="handleStatusUpdated"
         />
 
         <p v-else class="supporting-text devices-page__empty">

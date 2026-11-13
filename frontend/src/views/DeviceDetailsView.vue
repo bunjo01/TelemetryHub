@@ -6,6 +6,7 @@ import BaseIconButton from "../components/ui/BaseIconButton.vue";
 import InfoTooltip from "../components/ui/InfoTooltip.vue";
 import DeviceFormDialog from "../features/devices/components/DeviceFormDialog.vue";
 import DeviceStatus from "../features/devices/components/DeviceStatus.vue";
+import DeviceStatusControl from "../features/devices/components/DeviceStatusControl.vue";
 import {
   createDeviceListQuery,
   readDeviceListQuery,
@@ -21,6 +22,7 @@ const auth = useAuthStore();
 const notifications = useNotificationStore();
 const isOwner = computed(() => auth.user?.role === "company_owner");
 const isEditOpen = ref(false);
+const isStatusBusy = ref(false);
 
 const deviceId = computed(() => route.params.id);
 const listQuery = computed(() =>
@@ -76,7 +78,12 @@ async function handleDeviceUpdated(updatedDevice) {
 
 watch(deviceId, () => {
   isEditOpen.value = false;
+  isStatusBusy.value = false;
 });
+
+function handleStatusUpdated(updatedDevice) {
+  if (updatedDevice.id === deviceId.value) device.value = updatedDevice;
+}
 
 async function copyDeviceId() {
   if (!device.value || isCopying.value) return;
@@ -160,11 +167,20 @@ onBeforeUnmount(() => {
         <h1 class="device-details__title" tabindex="-1">
           {{ device?.name ?? "Device details" }}
         </h1>
-        <DeviceStatus v-if="device" :status="device.status" />
+        <DeviceStatus v-if="device && !isOwner" :status="device.status" />
       </div>
+      <DeviceStatusControl
+        v-if="isOwner && device"
+        :key="device.id"
+        :device="device"
+        :disabled="isEditOpen"
+        @busy="isStatusBusy = $event"
+        @updated="handleStatusUpdated"
+      />
       <BaseButton
         v-if="isOwner && device"
         aria-haspopup="dialog"
+        :disabled="isStatusBusy"
         @click="isEditOpen = true"
       >
         Edit device
