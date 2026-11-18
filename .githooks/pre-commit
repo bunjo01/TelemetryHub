@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+python="$root/backend/.venv/bin/python"
+
+if [ ! -x "$python" ]; then
+    printf '%s\n' 'Pre-commit: install backend/.venv and backend development dependencies first.' >&2
+    exit 1
+fi
+
+exec "$python" "$root/.githooks/pre_commit.py"
